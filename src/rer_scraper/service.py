@@ -13,6 +13,7 @@ from rer_client.models import (
     OrganisationStation,
     OrganisationSummary,
     OrganisationDetail,
+    User,
 )
 from rer_scraper.models import (
     RefreshResult,
@@ -156,7 +157,8 @@ class RERScraperService:
         rer = self.client_factory(cookies)
         result = ScraperResult()
         if "refresh_data" in operations:
-            organisations, stations, certificates = self.get_current_data(rer)
+            user, organisations, stations, certificates = self.get_current_data(rer)
+            self.update_rer_user(user)
             self.update_rer_organisations(organisations)
             # TODO: update stations
 
@@ -165,10 +167,11 @@ class RERScraperService:
 
         return 200, result
 
-    # endregion orchestrator
-    # region data refresh helpers
-
     def get_current_data(self, rer: RERClient):
+
+        user = rer.get_user()
+        logger.info(f"Fetched user: {user}")
+
         organisation_summaries = rer.get_user_org_summary()
         logger.info(
             f"Fetched {len(organisation_summaries)} organisations for logged in user. Getting extra info for each organisation..."
@@ -184,7 +187,7 @@ class RERScraperService:
             for org in organisations
         ]
         logger.info(f"Fetched stations for {len(organisation_stations)} organisations")
-        logger.debug(f"Stations: {organisation_stations}")
+        # logger.debug(f"Stations: {organisation_stations}")
         organisation_certificates = [
             rer.get_organisation_certificates(org.org_summary.organisation_id)
             for org in organisations
@@ -192,9 +195,14 @@ class RERScraperService:
         logger.info(
             f"Fetched certificates for {len(organisation_certificates)} organisations"
         )
-        logger.debug(f"Certificates: {organisation_certificates}")
+        # logger.debug(f"Certificates: {organisation_certificates}")
 
-        return organisations, organisation_stations, organisation_certificates
+        # endregion organisations
+
+        return user, organisations, organisation_stations, organisation_certificates
+
+    # endregion orchestrators
+    # region data update helpers
 
     def update_rer_organisations(
         self,
@@ -255,6 +263,13 @@ class RERScraperService:
             self.smartsuite.create_organisations(insert_orgs)
         else:
             logger.warning("Dry run mode: skipping SmartSuite writes")
+
+    def update_rer_user(self, user: User) -> None:
+        logger.info(f"Updating RER user: {user}")
+        if not self.dry_run:
+            self.smartsuite.update_user(self.smartsuite.map_user(user))
+        else:
+            logger.warning("Dry run mode: skipping SmartSuite user update")
 
     # endregion data refresh helpers
 

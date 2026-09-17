@@ -16,6 +16,7 @@ from rer_client.models import (
     OrganisationDetail,
     OrganisationStation,
     OrganisationSummary,
+    User,
 )
 from rer_scraper.models import ScraperOperations
 
@@ -33,6 +34,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
     # table ids
     table_id_scraper_job_configuration_table_id = "663d2313b4e7828a33b1ac07"
     table_id_ro_organisations = "665dc5a9eb40433ff6407de9"
+    table_id_ro_logins = "652b1faba9847148f31cee2b"
     table_id_ro_stations = "652b1faba9847148f31cee2a"
 
     def __init__(self, account_id: str, api_token: str):
@@ -107,6 +109,16 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
     # region mappers
 
+    def map_user(self, user: User):
+        return {
+            "scb73bd95a": {
+                "first_name": user.full_name.split(" ")[0],
+                "last_name": " ".join(user.full_name.split(" ")[1:]),
+            },
+            "sc87fbb8dc": [user.email],
+            # TODO: get user phone number from /Account/EditPhoneNumber
+        }
+
     def map_organisation(
         self,
         rer_organisation_summary: OrganisationSummary,
@@ -162,6 +174,22 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
     # region changes
 
+    def update_user(self, user: dict):
+        """Update an existing user record in SmartSuite."""
+        logger.info(f"Updating user in SmartSuite...")
+        logger.debug(f"User to update: {user}")
+
+        try:
+            result = self.ss.bulk_update_records(
+                table_id=self.table_id_ro_logins, records=[user]
+            )
+            logger.info(f"Successfully updated user")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to update user: {e}")
+            logger.error(f"Failed record: {user}")
+            raise
+
     def update_organisations(self, update_orgs: list[dict]):
         """Update existing organisation records in SmartSuite."""
         logger.info(f"Updating {len(update_orgs)} organisation(s) in SmartSuite...")
@@ -171,10 +199,10 @@ class RERSmartSuiteClient(SmartSuiteClient):
             result = self.ss.bulk_update_records(
                 table_id=self.table_id_ro_organisations, records=update_orgs
             )
-            logger.info(f"✓ Successfully updated {len(update_orgs)} organisation(s)")
+            logger.info(f"Successfully updated {len(update_orgs)} organisation(s)")
             return result
         except Exception as e:
-            logger.error(f"✗ Failed to update organisations: {e}")
+            logger.error(f"Failed to update organisations: {e}")
             logger.error(f"Failed records: {update_orgs}")
             raise
 
@@ -187,9 +215,9 @@ class RERSmartSuiteClient(SmartSuiteClient):
             result = self.ss.bulk_add_new_records(
                 table_id=self.table_id_ro_organisations, records=new_orgs
             )
-            logger.info(f"✓ Successfully created {len(new_orgs)} organisation(s)")
+            logger.info(f"Successfully created {len(new_orgs)} organisation(s)")
             return result
         except Exception as e:
-            logger.error(f"✗ Failed to create organisations: {e}")
+            logger.error(f"Failed to create organisations: {e}")
             logger.error(f"Failed records: {new_orgs}")
             raise
