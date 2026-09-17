@@ -13,13 +13,11 @@ from rer_session_auth.auth import (
 )
 from rer_session_auth.store import CookieStore, build_cookie_store
 
-
 log = logging.getLogger(__name__)
 
 
 class RefreshInvoker(Protocol):
-    def invoke(self, function_name: str, payload: dict[str, Any]) -> None:
-        ...
+    def invoke(self, function_name: str, payload: dict[str, Any]) -> None: ...
 
 
 class Boto3RefreshInvoker:
@@ -50,7 +48,7 @@ class SessionCookieService:
         self.function_name = function_name
 
     def get_cookies(self) -> dict[str, Any]:
-        cached_cookies = sanitize_cookies(self.store.load_cookies() or {})
+        cached_cookies = sanitize_cookies(self.store.load_auth_params()[0] or {})
         if cached_cookies and are_cookies_valid(cached_cookies):
             log.info("Returning cached RER session cookies")
             return _response(200, {"cookies": cached_cookies})
@@ -77,12 +75,18 @@ def _response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
 def build_cookie_service() -> SessionCookieService:
     function_name = os.getenv("AWS_LAMBDA_FUNCTION_NAME")
     if not function_name:
-        raise RuntimeError("AWS_LAMBDA_FUNCTION_NAME is required to start a cookie refresh.")
+        raise RuntimeError(
+            "AWS_LAMBDA_FUNCTION_NAME is required to start a cookie refresh."
+        )
+
+    store = build_cookie_store()
+    email = store.load_auth_params()[1]
+    password = store.load_auth_params()[2]
 
     return SessionCookieService(
-        store=build_cookie_store(),
+        store=store,
         refresh_invoker=Boto3RefreshInvoker(),
-        auth_config=RERAuthConfig.from_env(),
+        auth_config=RERAuthConfig.from_env(email, password),
         function_name=function_name,
     )
 

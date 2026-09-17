@@ -37,10 +37,14 @@ class StubSession:
         return self.patch_response
 
 
-def make_store(*, cookies_field: str = "session_cookies", refreshed_at_field: str | None = None) -> SmartSuiteCookieStore:
+def make_store(
+    *, cookies_field: str = "session_cookies", refreshed_at_field: str | None = None
+) -> SmartSuiteCookieStore:
     store = SmartSuiteCookieStore(
         api_url="https://app.smartsuite.com/api/v1",
         api_token="token-123",
+        email_field="sb966ee382",
+        password_field="sb4e5173b6",
         account_id="workspace-456",
         table_id="table-789",
         record_id="record-101",
@@ -56,11 +60,14 @@ def test_load_cookies_reads_json_string_field():
     store = make_store()
     store.session.get_response = StubResponse({"session_cookies": '{"foo": "bar"}'})  # type: ignore[attr-defined]
 
-    cookies = store.load_cookies()
+    cookies = store.load_auth_params()
 
     assert cookies == {"foo": "bar"}
     assert store.session.get_calls == [  # type: ignore[attr-defined]
-        ("https://app.smartsuite.com/api/v1/applications/table-789/records/record-101/", 12)
+        (
+            "https://app.smartsuite.com/api/v1/applications/table-789/records/record-101/",
+            12,
+        )
     ]
 
 
@@ -68,14 +75,14 @@ def test_load_cookies_accepts_object_field():
     store = make_store()
     store.session.get_response = StubResponse({"session_cookies": {"foo": "bar", "baz": 1}})  # type: ignore[attr-defined]
 
-    assert store.load_cookies() == {"foo": "bar", "baz": "1"}
+    assert store.load_auth_params() == {"foo": "bar", "baz": "1"}
 
 
 def test_load_cookies_returns_none_when_field_missing():
     store = make_store()
     store.session.get_response = StubResponse({"other": "value"})  # type: ignore[attr-defined]
 
-    assert store.load_cookies() is None
+    assert store.load_auth_params() is None
 
 
 def test_save_cookies_patches_record_with_json_string():
@@ -85,7 +92,10 @@ def test_save_cookies_patches_record_with_json_string():
 
     assert len(store.session.patch_calls) == 1  # type: ignore[attr-defined]
     url, payload, timeout = store.session.patch_calls[0]  # type: ignore[attr-defined]
-    assert url == "https://app.smartsuite.com/api/v1/applications/table-789/records/record-101/"
+    assert (
+        url
+        == "https://app.smartsuite.com/api/v1/applications/table-789/records/record-101/"
+    )
     assert json.loads(payload["session_cookies"]) == {"foo": "bar"}
     assert "refreshed_at" in payload
     assert timeout == 12
@@ -97,13 +107,15 @@ def test_validate_configuration_requires_account_id():
         api_token="token-123",
         account_id=None,
         table_id="table-789",
+        email_field="sb966ee382",
+        password_field="sb4e5173b6",
         record_id="record-101",
         cookies_field="session_cookies",
         refreshed_at_field=None,
     )
 
     with pytest.raises(RuntimeError, match="SMARTSUITE_ACCOUNT_ID"):
-        store.load_cookies()
+        store.load_auth_params()
 
 
 def test_load_cookies_rejects_invalid_payload_type():
@@ -111,4 +123,4 @@ def test_load_cookies_rejects_invalid_payload_type():
     store.session.get_response = StubResponse({"session_cookies": ["bad"]})  # type: ignore[attr-defined]
 
     with pytest.raises(ValueError, match="Unsupported cookie payload type"):
-        store.load_cookies()
+        store.load_auth_params()

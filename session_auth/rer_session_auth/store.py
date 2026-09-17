@@ -9,11 +9,11 @@ import requests
 
 
 class CookieStore(Protocol):
-    def load_cookies(self) -> dict[str, str] | None:
-        ...
+    def load_auth_params(
+        self,
+    ) -> tuple[dict[str, str] | None, str | None, str | None]: ...
 
-    def save_cookies(self, cookies: dict[str, str]) -> None:
-        ...
+    def save_cookies(self, cookies: dict[str, str]) -> None: ...
 
 
 class SmartSuiteCookieStore:
@@ -25,6 +25,8 @@ class SmartSuiteCookieStore:
         table_id: str | None,
         record_id: str | None,
         cookies_field: str,
+        email_field: str | None,
+        password_field: str | None,
         refreshed_at_field: str | None,
         timeout: int = 30,
     ):
@@ -34,6 +36,8 @@ class SmartSuiteCookieStore:
         self.table_id = table_id
         self.record_id = record_id
         self.cookies_field = cookies_field
+        self.email_field = email_field
+        self.password_field = password_field
         self.refreshed_at_field = refreshed_at_field
         self.timeout = timeout
         self.session = requests.Session()
@@ -54,21 +58,25 @@ class SmartSuiteCookieStore:
             table_id=os.getenv("SMARTSUITE_TABLE_ID"),
             record_id=os.getenv("SMARTSUITE_RECORD_ID"),
             cookies_field=os.getenv("SMARTSUITE_COOKIES_FIELD", "session_cookies"),
+            email_field="sb966ee382",
+            password_field="sb4e5173b6",
             refreshed_at_field=os.getenv("SMARTSUITE_REFRESHED_AT_FIELD"),
             timeout=int(os.getenv("SMARTSUITE_TIMEOUT_SECONDS", "30")),
         )
 
-    def load_cookies(self) -> dict[str, str] | None:
+    def load_auth_params(self) -> tuple[dict[str, str] | None, str | None, str | None]:
         response = self.session.get(self._record_url(), timeout=self.timeout)
         response.raise_for_status()
         record = response.json()
 
         raw_value = record.get(self.cookies_field)
+        email = record.get(self.email_field)
+        password = record.get(self.password_field)
         if raw_value is None:
-            return None
+            return None, email, password
 
         cookies = self._coerce_cookies(raw_value)
-        return cookies or None
+        return cookies or None, email, password
 
     def save_cookies(self, cookies: dict[str, str]) -> None:
         payload: dict[str, str] = {
@@ -77,7 +85,9 @@ class SmartSuiteCookieStore:
         if self.refreshed_at_field:
             payload[self.refreshed_at_field] = datetime.now(UTC).isoformat()
 
-        response = self.session.patch(self._record_url(), json=payload, timeout=self.timeout)
+        response = self.session.patch(
+            self._record_url(), json=payload, timeout=self.timeout
+        )
         response.raise_for_status()
 
     def _record_url(self) -> str:
@@ -99,7 +109,9 @@ class SmartSuiteCookieStore:
         if not self.cookies_field:
             missing.append("SMARTSUITE_COOKIES_FIELD")
         if missing:
-            raise RuntimeError(f"Missing SmartSuite configuration: {', '.join(missing)}")
+            raise RuntimeError(
+                f"Missing SmartSuite configuration: {', '.join(missing)}"
+            )
 
     def _coerce_cookies(self, raw_value: object) -> dict[str, str]:
         if isinstance(raw_value, str):
@@ -107,7 +119,9 @@ class SmartSuiteCookieStore:
                 return {}
             parsed = json.loads(raw_value)
             if not isinstance(parsed, dict):
-                raise ValueError(f"Expected JSON object in SmartSuite field {self.cookies_field}.")
+                raise ValueError(
+                    f"Expected JSON object in SmartSuite field {self.cookies_field}."
+                )
             return self._stringify_cookie_values(parsed)
 
         if isinstance(raw_value, dict):
@@ -119,7 +133,11 @@ class SmartSuiteCookieStore:
 
     @staticmethod
     def _stringify_cookie_values(cookies: dict[object, object]) -> dict[str, str]:
-        return {str(name): str(value) for name, value in cookies.items() if value is not None}
+        return {
+            str(name): str(value)
+            for name, value in cookies.items()
+            if value is not None
+        }
 
 
 def build_cookie_store() -> CookieStore:

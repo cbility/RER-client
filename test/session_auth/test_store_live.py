@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 from rer_session_auth.store import SmartSuiteCookieStore
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -37,16 +36,22 @@ def _load_live_store() -> SmartSuiteCookieStore:
 
 
 def _patch_raw_fields(store: SmartSuiteCookieStore, payload: dict[str, object]) -> None:
-    response = store.session.patch(store._record_url(), json=payload, timeout=store.timeout)
+    response = store.session.patch(
+        store._record_url(), json=payload, timeout=store.timeout
+    )
     response.raise_for_status()
 
 
-def _restore_record_fields(store: SmartSuiteCookieStore, original_record: dict[str, object]) -> None:
+def _restore_record_fields(
+    store: SmartSuiteCookieStore, original_record: dict[str, object]
+) -> None:
     restore_payload: dict[str, object] = {
         store.cookies_field: original_record.get(store.cookies_field, ""),
     }
     if store.refreshed_at_field:
-        restore_payload[store.refreshed_at_field] = original_record.get(store.refreshed_at_field, "")
+        restore_payload[store.refreshed_at_field] = original_record.get(
+            store.refreshed_at_field, ""
+        )
     _patch_raw_fields(store, restore_payload)
 
 
@@ -72,7 +77,9 @@ def test_smartsuite_store_round_trip_live():
 
     original_cookies_present = store.cookies_field in original_record
     original_cookies_value = original_record.get(store.cookies_field)
-    original_refreshed_present = bool(store.refreshed_at_field and store.refreshed_at_field in original_record)
+    original_refreshed_present = bool(
+        store.refreshed_at_field and store.refreshed_at_field in original_record
+    )
     original_refreshed_value = (
         original_record.get(store.refreshed_at_field)
         if store.refreshed_at_field
@@ -86,16 +93,20 @@ def test_smartsuite_store_round_trip_live():
 
     try:
         store.save_cookies(probe_cookies)
-        loaded_cookies = store.load_cookies()
+        loaded_cookies = store.load_auth_params()
         assert loaded_cookies == probe_cookies
 
-        updated_record_response = store.session.get(store._record_url(), timeout=store.timeout)
+        updated_record_response = store.session.get(
+            store._record_url(), timeout=store.timeout
+        )
         updated_record_response.raise_for_status()
         updated_record = updated_record_response.json()
         assert json.loads(updated_record[store.cookies_field]) == probe_cookies
     finally:
         restore_payload: dict[str, object] = {
-            store.cookies_field: original_cookies_value if original_cookies_present else "",
+            store.cookies_field: (
+                original_cookies_value if original_cookies_present else ""
+            ),
         }
         if store.refreshed_at_field:
             restore_payload[store.refreshed_at_field] = (
@@ -114,7 +125,7 @@ def test_session_auth_starts_refresh_and_caches_cookies_live():
 
     try:
         _patch_raw_fields(store, {store.cookies_field: ""})
-        assert store.load_cookies() is None
+        assert store.load_auth_params() is None
 
         response = requests.get(
             api_url,
@@ -132,11 +143,14 @@ def test_session_auth_starts_refresh_and_caches_cookies_live():
         deadline = monotonic() + 300
         refreshed_cookies = None
         while monotonic() < deadline:
-            refreshed_cookies = store.load_cookies()
+            refreshed_cookies = store.load_auth_params()
             if refreshed_cookies:
                 break
             sleep(60)
         assert refreshed_cookies
-        assert all(not name.startswith("ai_") for name in refreshed_cookies)
+        assert all(
+            name is not None and not name.startswith("ai_")
+            for name in refreshed_cookies
+        )
     finally:
         _restore_record_fields(store, original_record)

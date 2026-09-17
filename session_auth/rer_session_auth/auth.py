@@ -45,10 +45,10 @@ class RERAuthConfig:
     wait_between_retries: int = 10
 
     @classmethod
-    def from_env(cls) -> "RERAuthConfig":
+    def from_env(cls, email, password) -> "RERAuthConfig":
         return cls(
-            email=os.getenv("RER_EMAIL"),
-            password=os.getenv("RER_PASSWORD"),
+            email=email,
+            password=password,
             gmail_token_json=os.getenv("GMAIL_TOKEN_JSON"),
             gmail_token_file=os.getenv("GMAIL_TOKEN_FILE"),
             headless=_env_bool("PLAYWRIGHT_HEADLESS", True),
@@ -280,9 +280,11 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
     from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
 
     if not config.email:
-        raise MissingConfigurationError("Set RER_EMAIL for the auth Lambda.")
+        raise MissingConfigurationError("Set email in the login record on SmartSuite.")
     if not config.password:
-        raise MissingConfigurationError("Set RER_PASSWORD for the auth Lambda.")
+        raise MissingConfigurationError(
+            "Set password in the login record on SmartSuite."
+        )
 
     log.info("Authenticating with RER portal as %s", config.email)
 

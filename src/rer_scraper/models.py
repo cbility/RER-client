@@ -12,7 +12,9 @@ class TransferInstruction:
     end_period: str
     certificate_type: str = "REGO"
 
+
 ScraperOperations = Literal["refresh_data", "transfer_certificates"]
+
 
 @dataclass
 class RefreshResult:
