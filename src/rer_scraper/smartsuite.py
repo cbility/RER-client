@@ -27,7 +27,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
     """Owns SmartSuite HTTP access and scraper-specific record mappings."""
 
     # record ids
-    record_id_rer_scaper = (
+    record_id_rer_scraper = (
         "6a7104dc65c1e43caf1f2792",
     )  # smartsuite record ID belonging to the record for the scraper
 
