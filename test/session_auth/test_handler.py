@@ -12,6 +12,11 @@ class StubStore:
         self.cookies = cookies
         self.saved_cookies: dict[str, str] | None = None
 
+    def load_auth_params(
+        self,
+    ) -> tuple[dict[str, str] | None, str | None, str | None]:
+        return self.cookies, None, None
+
     def load_cookies(self) -> dict[str, str] | None:
         return self.cookies
 
@@ -48,7 +53,10 @@ def test_returns_valid_cached_cookies(monkeypatch):
     invoker = StubRefreshInvoker()
     service = make_service(store, invoker)
 
-    monkeypatch.setattr("rer_session_auth.handler.are_cookies_valid", lambda cookies: cookies == {"session": "cached"})
+    monkeypatch.setattr(
+        "rer_session_auth.handler.are_cookies_valid",
+        lambda cookies: cookies == {"session": "cached"},
+    )
 
     response = service.get_cookies()
 
@@ -63,7 +71,9 @@ def test_starts_background_refresh_for_invalid_cookies(monkeypatch):
     invoker = StubRefreshInvoker()
     service = make_service(store, invoker)
 
-    monkeypatch.setattr("rer_session_auth.handler.are_cookies_valid", lambda cookies: False)
+    monkeypatch.setattr(
+        "rer_session_auth.handler.are_cookies_valid", lambda cookies: False
+    )
     response = service.get_cookies()
 
     assert response["statusCode"] == 202
