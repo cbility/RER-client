@@ -37,6 +37,7 @@ def build_service(dry_run: bool = False) -> RERScraperService:
     auth_api_key = os.getenv("RER_SESSION_AUTH_API_KEY_VALUE")
     smartsuite_account_id = os.getenv("SMARTSUITE_ACCOUNT_ID")
     smartsuite_api_key = os.getenv("SMARTSUITE_API_KEY")
+    ss_login_record_id = "6a7f301f54fd4d6f819c1e5f"
 
     if not function_name:
         raise RuntimeError(
@@ -58,6 +59,7 @@ def build_service(dry_run: bool = False) -> RERScraperService:
         session_auth=SessionAuthClient(auth_api_url, auth_api_key),
         retry_invoker=Boto3RetryInvoker(),
         function_name=function_name,
+        ss_login_record_id=ss_login_record_id,
         dry_run=dry_run,
     )
 

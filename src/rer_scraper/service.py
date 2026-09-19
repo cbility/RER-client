@@ -129,6 +129,7 @@ class RERScraperService:
         session_auth: SessionAuthClient,
         retry_invoker: RetryInvoker,
         function_name: str,
+        ss_login_record_id: str,
         client_factory: Callable[[dict[str, str]], RERClient] = RERClient,
         dry_run: bool = False,
     ):
@@ -138,6 +139,7 @@ class RERScraperService:
         self.function_name = function_name
         self.client_factory = client_factory
         self.dry_run = dry_run
+        self.ss_login_record_id = ss_login_record_id
 
     # endregion initialisation
     # region orchestrator
@@ -159,7 +161,7 @@ class RERScraperService:
         if "refresh_data" in operations:
             user, organisations, stations, certificates = self.get_current_data(rer)
             self.update_rer_user(user)
-            self.update_rer_organisations(organisations)
+            self.update_rer_organisations(organisations, self.ss_login_record_id)
             # TODO: update stations
 
         if "transfer_certificates" in operations:
@@ -207,6 +209,7 @@ class RERScraperService:
     def update_rer_organisations(
         self,
         organisations: list[REROrganisation],
+        ss_user_record_id: str,
     ):
         """
         Updates organisation and station records on SmartSuite with the passed details.
@@ -238,14 +241,18 @@ class RERScraperService:
                 update_orgs.append(
                     {
                         **self.smartsuite.map_organisation(
-                            org.org_summary, org.org_detail
+                            org.org_summary,
+                            org.org_detail,
+                            ss_user_record_id,
                         ),
                         "id": ss_org_record["id"],
                     }
                 )
             else:
                 insert_orgs.append(
-                    self.smartsuite.map_organisation(org.org_summary, org.org_detail)
+                    self.smartsuite.map_organisation(
+                        org.org_summary, org.org_detail, ss_user_record_id
+                    )
                 )
 
         if update_orgs:

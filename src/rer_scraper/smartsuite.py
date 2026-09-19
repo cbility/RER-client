@@ -123,6 +123,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
         self,
         rer_organisation_summary: OrganisationSummary,
         rer_organisation_details: OrganisationDetail,
+        ss_user_record_id: str,
     ):
         ss_organisation = {
             "sde6082ea0": rer_organisation_summary.name,  # generator/company name
@@ -139,6 +140,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
             },
             "s90b4a920a": rer_organisation_details.type,
             "s8aaed9a66": rer_organisation_summary.user_status,
+            "saskuds9": [ss_user_record_id],
         }
         return ss_organisation
 
