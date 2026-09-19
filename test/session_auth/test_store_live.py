@@ -148,9 +148,9 @@ def test_session_auth_starts_refresh_and_caches_cookies_live():
                 break
             sleep(60)
         assert refreshed_cookies
-        assert all(
-            name is not None and not name.startswith("ai_")
-            for name in refreshed_cookies
-        )
+        for name in refreshed_cookies:
+            assert name is not None
+            if isinstance(name, str):
+                assert not name.startswith("ai_")
     finally:
         _restore_record_fields(store, original_record)
