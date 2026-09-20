@@ -162,7 +162,7 @@ class RERScraperService:
             user, organisations, stations, certificates = self.get_current_data(rer)
             self.update_rer_user(user)
             self.update_rer_organisations(organisations, self.ss_login_record_id)
-            # TODO: update stations
+            self.update_rer_stations(stations, certificates, run_start)
 
         if "transfer_certificates" in operations:
             raise NotImplementedError
@@ -184,11 +184,16 @@ class RERScraperService:
             organisations.append(REROrganisation(org_summary, org_detail))
 
         # logger.debug(f"Organisations: {organisations}")
-        organisation_stations = [
+        organisation_stations_lists = [
             rer.get_organisation_stations(org.org_summary.organisation_id)
             for org in organisations
         ]
-        logger.info(f"Fetched stations for {len(organisation_stations)} organisations")
+        organisation_stations = [
+            station for sub_list in organisation_stations_lists for station in sub_list
+        ]
+        logger.info(
+            f"Fetched {len(organisation_stations)} stations for {len(organisation_stations_lists)} organisations"
+        )
         # logger.debug(f"Stations: {organisation_stations}")
         organisation_certificates = [
             rer.get_organisation_certificates(org.org_summary.organisation_id)
@@ -212,9 +217,8 @@ class RERScraperService:
         ss_user_record_id: str,
     ):
         """
-        Updates organisation and station records on SmartSuite with the passed details.
+        Updates organisation records on SmartSuite with the passed details.
         Updates records if they already exist, otherwise creates new records.
-        Certificate information is used to create statistics and stores at the station level.
         """
 
         ss_organisations = (
@@ -277,6 +281,71 @@ class RERScraperService:
             self.smartsuite.update_user(self.smartsuite.map_user(user))
         else:
             logger.warning("Dry run mode: skipping SmartSuite user update")
+
+    def update_rer_stations(
+        self,
+        stations: list[OrganisationStation],
+        certificates: list[CertificatesOverview],
+        run_start: datetime,
+    ):
+        """
+        Updates station records on SmartSuite with the passed details.
+        Updates records if they already exist, otherwise creates new records.
+        Certificate information is used to create statistics and is stored at the station level.
+        """
+
+        ss_stations = [] if self.dry_run else self.smartsuite.get_current_stations()
+
+        # spit records into updates and inserts
+
+        update_stations = []
+        insert_stations = []
+        logger.info(f"Processing {len(stations)} stations")
+        for station in stations:
+            logger.debug(f"   {station}")
+            ss_station_record = next(
+                (
+                    ss_station
+                    for ss_station in ss_stations
+                    if self.smartsuite.get_station_id(ss_station) == station.station_id
+                ),
+                None,
+            )
+            if ss_station_record is not None:
+                update_stations.append(
+                    {
+                        **self.smartsuite.map_station(
+                            rer_station=station,
+                            # certificates=certificates,
+                            update_time=run_start,
+                        ),
+                        "id": ss_station_record["id"],
+                    }
+                )
+            else:
+                insert_stations.append(
+                    self.smartsuite.map_station(
+                        rer_station=station,
+                        # certificates=certificates,
+                        update_time=run_start,
+                    )
+                )
+
+        if update_stations:
+            logger.info(f"{len(update_stations)} stations to UPDATE")
+            for station in update_stations:
+                logger.debug(f"  {station}")
+
+        if insert_stations:
+            logger.info(f"{len(insert_stations)} stations to CREATE")
+            for station in insert_stations:
+                logger.debug(f"  {station}")
+
+        if not self.dry_run:
+            self.smartsuite.update_stations(update_stations)
+            self.smartsuite.create_stations(insert_stations)
+        else:
+            logger.warning("Dry run mode: skipping SmartSuite writes")
 
     # endregion data refresh helpers
 
