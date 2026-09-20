@@ -43,6 +43,7 @@ def test_rego_each_item_has_fields(rego_breakdown):
     for item in rego_breakdown["items"]:
         assert isinstance(item["action"], str)
         assert isinstance(item["country"], str)
+        assert isinstance(item["station_id"], str)
         assert isinstance(item["station"], str)
         assert isinstance(item["technology"], str)
         assert isinstance(item["output_period"], str)

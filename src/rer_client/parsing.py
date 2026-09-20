@@ -465,10 +465,22 @@ def _parse_certificate_breakdown(
             count = int(cells[5].text(strip=True).replace(",", ""))
         except ValueError:
             count = 0
+        station_link = cells[2].css_first("a")
+        if not station_link:
+            raise ValueError("Certificate breakdown station row has no station link")
+        station_href = station_link.attrs.get("href", "") or ""
+        if "/Stations/" not in station_href:
+            raise ValueError(
+                "Certificate breakdown station link has an unexpected href"
+            )
+        station_id = station_href.split("/Stations/", 1)[1]
+        if not station_id:
+            raise ValueError("Certificate breakdown station link has no station ID")
         items.append(
             CertificateBreakdownItem(
                 action=cells[0].text(strip=True),
                 country=cells[1].text(strip=True),
+                station_id=station_id,
                 station=cells[2].text(strip=True),
                 technology=cells[3].text(strip=True),
                 output_period=cells[4].text(strip=True),

@@ -414,6 +414,7 @@ class CertificateBreakdownItem(RERModel):
     Example:
         action: "Issued"  # or "Transferred"
         country: "Scotland"
+        station_id: "469C9786-148B-4FFA-9E4B-0C30B0004AF3"
         station: "Glenskinno CHP"
         technology: "Biomass"
         output_period: "Aug 2025"
@@ -422,6 +423,7 @@ class CertificateBreakdownItem(RERModel):
 
     action: str  # Certificate action: "Issued", "Transferred", etc.
     country: str  # Country where generated
+    station_id: str  # Station UUID from the station details link
     station: str  # Station name
     technology: str  # Technology/fuel type
     output_period: str  # Period in "Mon YYYY" format
