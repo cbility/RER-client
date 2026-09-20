@@ -147,7 +147,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
     def map_station(
         self,
         rer_station: OrganisationStation,
-        certificates: list[CertificatesOverview],
+        # certificates: list[CertificatesOverview], # TODO: parse certificate/output period info
         update_time: datetime,
     ):
         ro_scheme_status = "Not Set"
@@ -158,8 +158,8 @@ class RERSmartSuiteClient(SmartSuiteClient):
             elif scheme.scheme == "REGO":
                 rego_scheme_status = scheme.status
 
-        for cert in certificates:
-            pass  # TODO: add certificate statistics to station mapping
+        # for cert in certificates:
+        #     pass  # TODO: add certificate statistics to station mapping
         ss_station = {
             "sb2a2fadfb": rer_station.station_id,  # station id
             "sde6082ea0": rer_station.station_name,  # station name
@@ -222,4 +222,36 @@ class RERSmartSuiteClient(SmartSuiteClient):
         except Exception as e:
             logger.error(f"Failed to create organisations: {e}")
             logger.error(f"Failed records: {new_orgs}")
+            raise
+
+    def update_stations(self, update_stations: list[dict]):
+        """Update existing station records in SmartSuite."""
+        logger.info(f"Updating {len(update_stations)} station(s) in SmartSuite...")
+        logger.debug(f"Stations to update: {update_stations}")
+
+        try:
+            result = self.ss.bulk_update_records(
+                table_id=self.table_id_ro_stations, records=update_stations
+            )
+            logger.info(f"Successfully updated {len(update_stations)} station(s)")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to update stations: {e}")
+            logger.error(f"Failed records: {update_stations}")
+            raise
+
+    def create_stations(self, new_stations: list[dict]):
+        """Create new station records in SmartSuite."""
+        logger.info(f"Creating {len(new_stations)} new station(s) in SmartSuite...")
+        logger.debug(f"Stations to create: {new_stations}")
+
+        try:
+            result = self.ss.bulk_add_new_records(
+                table_id=self.table_id_ro_stations, records=new_stations
+            )
+            logger.info(f"Successfully created {len(new_stations)} station(s)")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to create stations: {e}")
+            logger.error(f"Failed records: {new_stations}")
             raise
