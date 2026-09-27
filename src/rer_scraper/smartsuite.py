@@ -10,12 +10,14 @@ from smartsuite_python import (
 )
 from dataclasses import asdict
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 from rer_client.models import (
-    CertificatesOverview,
+    OrganisationCertificates,
     OrganisationDetail,
     OrganisationStation,
     OrganisationSummary,
+    StationOutputSubmission,
     User,
 )
 from rer_scraper.models import ScraperOperations
@@ -147,6 +149,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
     def map_station(
         self,
         rer_station: OrganisationStation,
+        output_periods: list[StationOutputSubmission],
         # certificates: list[CertificatesOverview], # TODO: parse certificate/output period info
         update_time: datetime,
     ):
@@ -158,8 +161,32 @@ class RERSmartSuiteClient(SmartSuiteClient):
             elif scheme.scheme == "REGO":
                 rego_scheme_status = scheme.status
 
-        # for cert in certificates:
-        #     pass  # TODO: add certificate statistics to station mapping
+        last_submission_date = None
+        oldest_REGOs_not_issued = None
+        oldest_ROCs_not_issued = None
+
+        asc_output_periods = sorted(output_periods, key=lambda x: x.period_month_start)
+        for output_period in asc_output_periods:
+            if "RO" in output_period.schemes:
+                if output_period.status != "Approved":
+                    oldest_ROCs_not_issued = output_period.period_month_start
+                else:
+                    oldest_ROCs_not_issued = (
+                        # Ensure that last not issued date is not empty if station approved for ROCs
+                        output_period.period_month_start
+                        + relativedelta(months=1)
+                    )
+            if "REGO" in output_period.schemes:
+                if output_period.status != "Approved":
+                    oldest_REGOs_not_issued = output_period.period_month_start
+                else:
+                    oldest_REGOs_not_issued = (
+                        # Ensure that last not issued date is not empty if station approved for REGOs
+                        output_period.period_month_start
+                        + relativedelta(months=1)
+                    )
+            last_submission_date = output_period.period_month_start
+
         ss_station = {
             "sb2a2fadfb": rer_station.station_id,  # station id
             "sde6082ea0": rer_station.station_name,  # station name
@@ -168,7 +195,25 @@ class RERSmartSuiteClient(SmartSuiteClient):
             "secb786709": rer_station.country,  #  country
             "secb786709": rer_station.technology_group,  # technology
             "s9c6cfc3d3": {"date": update_time.isoformat()},  # statistics last updated
-            "sqih0nxo": {"date": update_time.isoformat()},  # oldest regos not issued
+            "sacbaf74ee": {
+                "date": (
+                    last_submission_date.isoformat() if last_submission_date else None
+                )
+            },  # Last Submission
+            "sqih0nxo": {
+                "date": (
+                    oldest_REGOs_not_issued.isoformat()
+                    if oldest_REGOs_not_issued
+                    else None
+                )
+            },  # oldest regos not issued
+            "sd2f8e15e8": {
+                "date": (
+                    oldest_ROCs_not_issued.isoformat()
+                    if oldest_ROCs_not_issued
+                    else None
+                )
+            },  # oldest rocs not issued
         }
         return ss_station
 
