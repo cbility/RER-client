@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 import re
 from selectolax.parser import HTMLParser  # for parsing HTML
@@ -6,12 +7,14 @@ from rer_client.models import (
     CertificateBreakdownItem,
     CertificateHistory,
     CertificateHistoryMonth,
-    CertificatesOverview,
+    OrganisationCertificates,
     CertificateTypeSummary,
     OrganisationContact,
     OrganisationDetail,
     OrganisationSearchResult,
     OrganisationStation,
+    StationOutputSubmission,
+    OrganisationStationList,
     OrganisationSummary,
     OutputDataTask,
     OutputDataTaskList,
@@ -24,7 +27,7 @@ from rer_client.models import (
     StationDeclarationTaskList,
     StationDetail,
     StationOutputSubmission,
-    StationOutputSubmissionList,
+    OrganisationOutputSubmissionList,
     User,
 )
 
@@ -389,7 +392,7 @@ def _parse_find_organisation(html: str) -> Optional[OrganisationSearchResult]:
 
 def _parse_certificates_overview(
     html: str, organisation_id: str
-) -> CertificatesOverview:
+) -> OrganisationCertificates:
     tree = HTMLParser(html)
 
     desc_el = tree.css_first(".ofgem-rer-stat__description")
@@ -446,7 +449,7 @@ def _parse_certificates_overview(
             )
         )
 
-    return CertificatesOverview(
+    return OrganisationCertificates(
         organisation_id=organisation_id,
         balance_period=balance_period,
         summaries=summaries,
@@ -533,7 +536,7 @@ def _parse_certificate_history(
 
 def _parse_station_output_submissions(
     html: str, organisation_id: str
-) -> StationOutputSubmissionList:
+) -> OrganisationOutputSubmissionList:
     """Parse station output submissions from /Organisations/{organisationId}/Output.
 
     Args:
@@ -592,6 +595,9 @@ def _parse_station_output_submissions(
             StationOutputSubmission(
                 submission_id=submission_id,
                 period=cells[0].text(strip=True),
+                period_month_start=datetime.strptime(
+                    cells[0].text(strip=True), "%b %Y"
+                ),
                 station_name=cells[1].text(strip=True),
                 station_id="",  # Not available in this view
                 schemes=schemes,
@@ -602,7 +608,7 @@ def _parse_station_output_submissions(
             )
         )
 
-    return StationOutputSubmissionList(
+    return OrganisationOutputSubmissionList(
         organisation_id=organisation_id,
         submissions=submissions,
     )

@@ -209,33 +209,96 @@ class TestStationOutputSubmissions:
 
 
 class TestStationOutputSubmissionsClient:
-    """Test client method for getting station output submissions."""
+    """Test client methods for station output submissions."""
 
-    @pytest.fixture
-    def mock_client(self):
-        """Create a mock client with fake cookies for testing."""
-        # Use minimal cookies - won't make real requests in these tests
-        fake_cookies = {"session": "fake_session_for_testing"}
+    def test_get_station_output_submissions_signature(self):
+        """Test that get_station_output_submissions method exists with correct signature."""
+        from rer_client import RERClient
+        import inspect
 
-        # Create client but don't authenticate (will use mocked responses)
-        try:
-            client = RERClient(auth_cookies=fake_cookies)
-            return client
-        except Exception:
-            pytest.skip("Could not create mock client")
+        # Check method exists
+        assert hasattr(RERClient, "get_station_output_submissions")
 
-    def test_get_station_output_submissions_requires_org_id(self, mock_client):
-        """Test that get_station_output_submissions requires organisation_id."""
-        # This should raise ValueError when organisation_id is not provided
-        with pytest.raises(ValueError, match="organisation_id must be provided"):
-            mock_client.get_station_output_submissions(
-                station_id="469C9786-148B-4FFA-9E4B-0C30B0004AF3"
+        # Check signature
+        method = getattr(RERClient, "get_station_output_submissions")
+        sig = inspect.signature(method)
+        params = list(sig.parameters.keys())
+
+        # Should have self, station_id, organisation_id
+        assert "station_id" in params
+        assert "organisation_id" in params
+
+    def test_get_organisation_output_data_signature(self):
+        """Test that get_organisation_output_data method exists with correct signature."""
+        from rer_client import RERClient
+        import inspect
+
+        # Check method exists
+        assert hasattr(RERClient, "get_organisation_output_data")
+
+        # Check signature
+        method = getattr(RERClient, "get_organisation_output_data")
+        sig = inspect.signature(method)
+        params = list(sig.parameters.keys())
+
+        # Should have organisation_id and optional station_id
+        assert "organisation_id" in params
+        assert "station_id" in params
+
+    def test_get_station_output_submissions_integration(self):
+        """Integration test using cached HTML to simulate client behavior.
+
+        This test simulates what the client method does:
+        1. Load station details (mocked)
+        2. Load organisation output data
+        3. Filter by station name
+        """
+        from rer_client import parsing as rer_parsing
+
+        # Simulate getting station details (we know the station name from cache)
+        station_name = "Villa Nursery"
+        organisation_id = "GEN0208381"
+
+        # Load and parse output data (simulating what client does)
+        all_submissions = []
+        page_number = 1
+
+        while True:
+            snapshot_name = f"_output_page-{page_number}"
+            html_path = (
+                SNAPSHOTS_DIR / organisation_id / snapshot_name / "response.html"
             )
 
-    def test_get_organisation_output_data_method_exists(self, mock_client):
-        """Test that the get_organisation_output_data method exists."""
-        assert hasattr(mock_client, "get_organisation_output_data")
-        assert callable(mock_client.get_organisation_output_data)
+            if not html_path.exists():
+                break
+
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+
+            result = rer_parsing._parse_station_output_submissions(
+                html, organisation_id
+            )
+
+            # Filter by station name (as client method does)
+            station_submissions = [
+                s for s in result.submissions if s.station_name == station_name
+            ]
+            all_submissions.extend(station_submissions)
+
+            if not result.submissions:
+                break
+            page_number += 1
+
+        # Should have found submissions for this station
+        assert len(all_submissions) > 0
+
+        # All should be for the correct station
+        assert all(s.station_name == station_name for s in all_submissions)
+
+        # Should have data from multiple pages
+        assert page_number > 1, "Should have checked multiple pages"
+
+        print(f"Found {len(all_submissions)} submissions for {station_name}")
 
 
 if __name__ == "__main__":

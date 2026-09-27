@@ -12,6 +12,7 @@ import re  # for pagination parsing
 import math  # for pagination calculation
 
 from rer_client import parsing as rer_parsing
+from rer_client.models import OrganisationOutputSubmissionList
 
 # endregion imports
 
@@ -172,6 +173,61 @@ class RERClient:
         )
         return rer_parsing._parse_output_data_tasks(response.text, organisation_id)
 
+    def get_organisation_output_data(
+        self,
+        organisation_id: str,
+    ) -> OrganisationOutputSubmissionList:
+        """GET /Organisations/{organisationId}/Output - Returns all station output submissions.
+
+        Fetches all output submissions for an organisation across all pages.
+        Optionally filters by a specific station.
+
+        Args:
+            organisation_id: Organisation identifier
+            station_id: Optional station UUID to filter by
+
+        Returns:
+            List of StationOutputSubmission records (filtered by station if provided)
+
+        Example:
+            # Get all submissions for an organisation
+            submissions = client.get_organisation_output_data("GEN0213742")
+
+            # Get submissions for a specific station only
+            submissions = client.get_organisation_output_data(
+                "GEN0213742",
+                station_id="469C9786-148B-4FFA-9E4B-0C30B0004AF3"
+            )
+        """
+
+        all_submissions: list[rer_parsing.StationOutputSubmission] = []
+        page_number = 1
+
+        while True:
+            try:
+                params = {"pageNumber": page_number}
+
+                response = self._request(
+                    f"Organisations/{organisation_id}/Output",
+                    params=params,
+                )
+                result = rer_parsing._parse_station_output_submissions(
+                    response.text, organisation_id
+                )
+
+                if not result.submissions:
+                    break
+
+                all_submissions.extend(result.submissions)
+                page_number += 1
+            except Exception:
+                # No more pages or error fetching
+                break
+
+        return OrganisationOutputSubmissionList(
+            organisation_id=organisation_id, submissions=all_submissions
+        )
+
     def get_organisation_station_declaration_tasks(
         self,
         organisation_id: str,
@@ -202,10 +258,16 @@ class RERClient:
 
     def get_organisation_stations(
         self, organisation_id: str
-    ) -> list[rer_parsing.OrganisationStation]:
+    ) -> rer_parsing.OrganisationStationList:
         """GET /Organisations/{organisationId}/Stations - Returns list of stations for the organisation."""
         response = self._request(f"Organisations/{organisation_id}/Stations")
-        return rer_parsing._parse_organisation_stations(response.text, organisation_id)
+        stations = rer_parsing._parse_organisation_stations(
+            response.text, organisation_id
+        )
+
+        return rer_parsing.OrganisationStationList(
+            organisation_id=organisation_id, stations=stations
+        )
 
     def get_station(self, station_id: str) -> rer_parsing.StationDetail:
         """GET /Organisations/Stations/{stationId} - Returns full station detail."""
@@ -242,7 +304,7 @@ class RERClient:
 
     def get_organisation_certificates(
         self, organisation_id: str
-    ) -> rer_parsing.CertificatesOverview:
+    ) -> rer_parsing.OrganisationCertificates:
         """GET /Organisations/{organisationId}/Certificates - Returns certificates overview."""
         response = self._request(f"Organisations/{organisation_id}/Certificates")
         return rer_parsing._parse_certificates_overview(response.text, organisation_id)

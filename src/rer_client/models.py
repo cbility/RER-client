@@ -235,7 +235,7 @@ class StationSchemeStatus(RERModel):
         status: "Approved"
     """
 
-    scheme: str  # Scheme name: "RO", "REGO", "REGORO", etc.
+    scheme: str  # Scheme name: "RO", "REGO" or "ROO-FIT"
     status: str  # Accreditation status, e.g., "Approved", "Pending"
 
 
@@ -402,7 +402,7 @@ class CertificateTypeSummary(RERModel):
 
 
 @dataclass
-class CertificatesOverview(RERModel):
+class OrganisationCertificates(RERModel):
     """Overview of all certificates for an organisation.
 
     Example:
@@ -532,7 +532,7 @@ class StationOutputSubmission(RERModel):
 
 
 @dataclass
-class StationOutputSubmissionList(RERModel):
+class OrganisationOutputSubmissionList(RERModel):
     """Collection of station output submissions for an organisation.
 
     Example:

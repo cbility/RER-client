@@ -48,7 +48,9 @@ def scraper() -> RERScraperService:
 
 
 def test_print_refresh_data(scraper: RERScraperService, client: RERClient):
-    user, organisations, stations, certificates = scraper.get_current_data(client)
+    user, organisations, stations, certificates, output_periods = (
+        scraper.get_current_data(client)
+    )
 
     print("User:")
     print(json.dumps(user, default=asdict, indent=2))
@@ -58,3 +60,5 @@ def test_print_refresh_data(scraper: RERScraperService, client: RERClient):
     print(json.dumps(stations, default=asdict, indent=2))
     print("Certificates:")
     print(json.dumps(certificates, default=asdict, indent=2))
+    print("Output Periods:")
+    print(json.dumps(output_periods, default=asdict, indent=2))
