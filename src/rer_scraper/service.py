@@ -142,7 +142,7 @@ class RERScraperService:
         self.ss_login_record_id = ss_login_record_id
 
     # endregion initialisation
-    # region orchestrator
+    # region orchestration
 
     def run(self, schedule_retry: bool = True) -> tuple[int, ScraperResult | None]:
         run_start = datetime.now()

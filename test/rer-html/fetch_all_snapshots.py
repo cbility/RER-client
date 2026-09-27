@@ -58,6 +58,29 @@ def save_snapshot(org_id: str, endpoint: str, html: str, parsed_data: object):
     log.info(f"  ✓ {endpoint}")
 
 
+def parse_output_submissions_ad_hoc(html: str) -> list[dict]:
+    """Ad-hoc row parse for /Organisations/{id}/Output, pending a real client parser."""
+    tree = HTMLParser(html)
+    rows = []
+    for row in tree.css("table tr"):
+        cells = row.css("td")
+        if len(cells) < 6:
+            continue
+        link = cells[0].css_first("a")
+        rows.append(
+            {
+                "period": cells[0].text(strip=True),
+                "url": link.attrs.get("href", "") if link else "",
+                "station": cells[1].text(strip=True),
+                "scheme": cells[2].text(strip=True),
+                "country": cells[3].text(strip=True),
+                "technology_group": cells[4].text(strip=True),
+                "status": cells[5].text(strip=True),
+            }
+        )
+    return rows
+
+
 def dataclass_to_dict(obj):
     """Convert dataclass to dict, handling nested dataclasses."""
     if hasattr(obj, "__dataclass_fields__"):
@@ -175,19 +198,55 @@ def main():
             except Exception as e:
                 log.error(f"  ✗ Certificates overview: {e}")
 
-            # 5. Output data tasks
+            # 5. Output data tasks (paginated)
             try:
                 log.info("  Fetching output data tasks...")
-                response = client._request(f"Organisations/{org_id}/Tasks/OutputData")
-                parsed = client.get_organisation_output_data_tasks(org_id)
-                save_snapshot(
-                    org_id,
-                    "/tasks/output-data",
-                    response.text,
-                    dataclass_to_dict(parsed),
-                )
+                page_number = 1
+                while True:
+                    response = client._request(
+                        f"Organisations/{org_id}/Tasks/OutputData",
+                        params={"pageNumber": page_number},
+                    )
+                    parsed = client.get_organisation_output_data_tasks(
+                        org_id, page_number=page_number
+                    )
+                    if not parsed.tasks:
+                        break
+                    save_snapshot(
+                        org_id,
+                        f"/tasks/output-data/page-{page_number}",
+                        response.text,
+                        dataclass_to_dict(parsed),
+                    )
+                    page_number += 1
             except Exception as e:
                 log.error(f"  ✗ Output data tasks: {e}")
+
+            # 5b. Output submissions, all periods/statuses (paginated)
+            try:
+                log.info("  Fetching output submissions...")
+                page_number = 1
+                while True:
+                    response = client._request(
+                        f"Organisations/{org_id}/Output",
+                        params={
+                            "sortField": "Period",
+                            "sortDirection": "Desc",
+                            "pageNumber": page_number,
+                        },
+                    )
+                    rows = parse_output_submissions_ad_hoc(response.text)
+                    if not rows:
+                        break
+                    save_snapshot(
+                        org_id,
+                        f"/output/page-{page_number}",
+                        response.text,
+                        rows,
+                    )
+                    page_number += 1
+            except Exception as e:
+                log.error(f"  ✗ Output submissions: {e}")
 
             # 6. Station declaration tasks
             try:
