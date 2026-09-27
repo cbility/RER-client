@@ -535,14 +535,14 @@ def _parse_station_output_submissions(
     html: str, organisation_id: str
 ) -> StationOutputSubmissionList:
     """Parse station output submissions from /Organisations/{organisationId}/Output.
-    
+
     Args:
         html: HTML content from the output submissions page
         organisation_id: Parent organisation ID
-        
+
     Returns:
         StationOutputSubmissionList containing all submissions
-        
+
     Example HTML structure:
         <table>
             <tr>
@@ -557,35 +557,37 @@ def _parse_station_output_submissions(
     """
     tree = HTMLParser(html)
     submissions: list[StationOutputSubmission] = []
-    
+
     for row in tree.css("table tr")[1:]:
         cells = row.css("td")
         if len(cells) < 6:
             continue
-        
+
         # Extract period and URL from first cell
         link = cells[0].css_first("a")
         url = link.attrs.get("href", "") if link else ""
         if not url:
             continue
-            
+
         # Extract submission ID from URL: /Organisations/{org}/Output/{uuid}/Review
         submission_id = ""
         url_parts = url.split("/")
         output_idx = next((i for i, p in enumerate(url_parts) if p == "Output"), None)
         if output_idx is not None and output_idx + 1 < len(url_parts):
             submission_id = url_parts[output_idx + 1].split("?")[0]
-        
+
         # Extract schemes from third cell (may contain multiple schemes separated by <br/>)
         schemes: list[str] = []
         scheme_cell = cells[2]
         # Get all text nodes separated by <br/> tags
-        scheme_texts = [node.text(strip=True) for node in scheme_cell.iter(include_text=True)]
+        scheme_texts = [
+            node.text(strip=True) for node in scheme_cell.iter(include_text=True)
+        ]
         for scheme_text in scheme_texts:
             scheme = scheme_text.strip()
             if scheme:
                 schemes.append(scheme)
-        
+
         submissions.append(
             StationOutputSubmission(
                 submission_id=submission_id,
@@ -599,7 +601,7 @@ def _parse_station_output_submissions(
                 url=url,
             )
         )
-    
+
     return StationOutputSubmissionList(
         organisation_id=organisation_id,
         submissions=submissions,
