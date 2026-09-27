@@ -264,7 +264,7 @@ def _parse_organisation_stations(
         for status_tag in cells[5].css("strong"):
             status = status_tag.text(strip=True)
             test_id = status_tag.attrs.get("data-test-id") or ""
-            match = re.search(r"-(rego|roofit)-status-tag$", test_id, re.IGNORECASE)
+            match = re.search(r"-(rego|ro|roofit)-status-tag$", test_id, re.IGNORECASE)
             scheme = match.group(1).upper() if match else cells[2].text(strip=True)
             if scheme == "ROOFIT":
                 scheme = "ROO-FIT"

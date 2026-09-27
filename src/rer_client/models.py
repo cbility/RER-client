@@ -231,7 +231,7 @@ class StationSchemeStatus(RERModel):
     """Scheme accreditation status for a station.
 
     Example:
-        scheme: "REGO"  # or "RO", "REGORO"
+        scheme: "REGO"  # or "RO", "ROO-FIT"
         status: "Approved"
     """
 
