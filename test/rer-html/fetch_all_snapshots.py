@@ -60,8 +60,7 @@ def main():
     log.info("Authenticating with RER...")
     try:
         client = get_client()
-        user = client.get_user()
-        log.info(f"Authenticated as: {user.full_name} ({user.email})")
+        log.info(f"Authenticated successfully.")
     except FileNotFoundError as e:
         log.error(f"✗ Authentication failed: {e}")
         log.error("")
@@ -151,11 +150,6 @@ def main():
                         f"Organisations/{org_id}/Tasks/OutputData",
                         params={"pageNumber": page_number},
                     )
-                    parsed = client.get_organisation_output_data_tasks(
-                        org_id, page_number=page_number
-                    )
-                    if not parsed.tasks:
-                        break
                     save_snapshot(
                         org_id,
                         f"/tasks/output-data/page-{page_number}",
@@ -204,14 +198,8 @@ def main():
             # 7. Certificate breakdown (need to get cert types first)
             try:
                 log.info("  Fetching certificates for breakdown...")
-                certs_overview = client.get_organisation_certificates(org_id)
 
-                # Get unique certificate types
-                cert_types = set()
-                if hasattr(certs_overview, "summaries") and certs_overview.summaries:
-                    for summary in certs_overview.summaries:
-                        if hasattr(summary, "cert_type"):
-                            cert_types.add(summary.cert_type)
+                cert_types = ["ROC", "REGO"]
 
                 # Fetch breakdown for each cert type
                 for cert_type in cert_types:
@@ -233,14 +221,8 @@ def main():
             # 8. Certificate history (need to get cert types first)
             try:
                 log.info("  Fetching certificates for history...")
-                certs_overview = client.get_organisation_certificates(org_id)
 
-                # Get unique certificate types
-                cert_types = set()
-                if hasattr(certs_overview, "summaries") and certs_overview.summaries:
-                    for summary in certs_overview.summaries:
-                        if hasattr(summary, "cert_type"):
-                            cert_types.add(summary.cert_type)
+                cert_types = ["ROC", "REGO"]
 
                 # Fetch history for each cert type
                 for cert_type in cert_types:
@@ -283,7 +265,7 @@ def main():
             # 9. Individual station details (from stations list)
             try:
                 stations = client.get_organisation_stations(org_id)
-                for station in stations[
+                for station in stations.stations[
                     :5
                 ]:  # Limit to first 5 stations to avoid too many requests
                     station_id = station.station_id
