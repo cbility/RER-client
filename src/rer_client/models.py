@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic.dataclasses import dataclass
@@ -487,6 +488,7 @@ class StationOutputSubmission(RERModel):
     Fields:
         submission_id: UUID of the submission (e.g., "2b916360-8484-4bf8-a7ea-d1902ff29ade")
         period: Reporting period in "Mon YYYY" format (e.g., "Aug 2026")
+        period_month_start: Start date of the reporting month as datetime
         station_name: Name of the station
         station_id: UUID of the station (if available, else empty string)
         schemes: List of schemes (e.g., ["RO", "REGO"], ["REGO", "ROO-FIT"], or ["REGO"])
@@ -511,6 +513,7 @@ class StationOutputSubmission(RERModel):
 
     submission_id: str  # UUID of the submission
     period: str  # Reporting period in "Mon YYYY" format
+    period_month_start: datetime  # Start date of the reporting month as datetime
     station_name: str  # Name of the station
     station_id: str  # UUID of the station (if available)
     schemes: list[str]  # List of schemes: "RO", "REGO", etc.
