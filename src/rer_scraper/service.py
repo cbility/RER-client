@@ -1,6 +1,7 @@
 # region imports
 import json
 from dataclasses import asdict, dataclass
+import os
 from typing import Any, Callable, Protocol
 from datetime import datetime
 from unittest import result
@@ -292,7 +293,11 @@ class RERScraperService:
     def update_rer_user(self, user: User) -> None:
         logger.info(f"Updating RER user: {user}")
         if not self.dry_run:
-            self.smartsuite.update_user(self.smartsuite.map_user(user))
+            user_record = {
+                "id": os.environ.get("SMARTSUITE_RECORD_ID", None),
+                **self.smartsuite.map_user(user),
+            }
+            self.smartsuite.update_user(user_record)
         else:
             logger.warning("Dry run mode: skipping SmartSuite user update")
 
