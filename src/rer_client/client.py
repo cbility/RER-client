@@ -431,16 +431,6 @@ class RERClient:
 
 if __name__ == "__main__":
 
-    def _save_cookies(cookies, cookies_file="../rer_cookies.json"):
-        """Save cookies to a file."""
-        # remove analytics/tracking cookies
-        persistent_cookies = {
-            key: value for key, value in cookies.items() if not key.startswith("ai_")
-        }
-        with open(cookies_file, "w") as f:
-            json.dump(persistent_cookies, f, indent=2)
-        log.debug(f"Cookies saved to {cookies_file}")
-
     def _load_cookies(cookies_file="../rer_cookies.json") -> dict:
         """Load saved cookies."""
         try:
