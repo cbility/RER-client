@@ -267,6 +267,14 @@ class OrganisationStation(RERModel):
 
 
 @dataclass
+class OrganisationStationList(RERModel):
+    """Collection of stations for an organisation."""
+
+    organisation_id: str  # Parent organisation ID
+    stations: list[OrganisationStation]  # List of stations for the organisation
+
+
+@dataclass
 class SchemeAccreditation(RERModel):
     """Individual scheme accreditation for a station.
 
