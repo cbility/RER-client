@@ -78,8 +78,14 @@ class CachedRERClient(RERClient):
             Path to the cached HTML file
         """
         # Handle pagination - include page number in path
-        if params and "pageNumber" in params and params["pageNumber"] > 1:
-            endpoint = f"{endpoint}_page{params['pageNumber']}"
+        # Note: Output endpoint uses format _output_page-N (with dash) for all pages including page 1
+        if params and "pageNumber" in params:
+            page_num = params["pageNumber"]
+            # Check if this is an Output endpoint
+            if endpoint.endswith("/Output"):
+                endpoint = f"{endpoint}_page-{page_num}"
+            elif page_num > 1:
+                endpoint = f"{endpoint}_page{page_num}"
 
         # Map endpoint to cache directory structure
         # User endpoint is special: "User" -> "_user/_user"
@@ -117,6 +123,9 @@ class CachedRERClient(RERClient):
                         cache_dir = f"_tasks_{task_type}"
                     else:
                         cache_dir = "_tasks"
+                elif endpoint_type.startswith("Output_page"):
+                    # Output endpoint uses _output_page-N format (already includes page number)
+                    cache_dir = f"_{endpoint_type.lower()}"
                 else:
                     cache_dir = f"_{endpoint_type.lower()}"
 
