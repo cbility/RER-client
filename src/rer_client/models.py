@@ -475,3 +475,57 @@ class CertificateHistory(RERModel):
     organisation_id: str  # Parent organisation ID
     cert_type: str  # Certificate type: "ROC", "REGO"
     months: list[CertificateHistoryMonth]  # Monthly history records
+
+
+@dataclass
+class StationOutputSubmission(RERModel):
+    """Station output data submission record.
+
+    Represents a single output data submission for a station.
+    Retrieved from /Organisations/{organisationId}/Output endpoint.
+
+    Fields:
+        submission_id: UUID of the submission (e.g., "2b916360-8484-4bf8-a7ea-d1902ff29ade")
+        period: Reporting period in "Mon YYYY" format (e.g., "Aug 2026")
+        station_name: Name of the station
+        station_id: UUID of the station (if available, else empty string)
+        schemes: List of schemes (e.g., ["RO", "REGO"])
+        country: Country location (e.g., "England", "Scotland")
+        technology_group: Technology classification (e.g., "Fuelled", "Wind")
+        status: Submission status (e.g., "In review", "Pending", "Approved", "Draft")
+        url: Relative URL to view/review this submission
+
+    Example:
+        submission_id: "2b916360-8484-4bf8-a7ea-d1902ff29ade"
+        period: "Aug 2026"
+        station_name: "Villa Nursery"
+        station_id: ""
+        schemes: ["RO", "REGO"]
+        country: "England"
+        technology_group: "Fuelled"
+        status: "In review"
+        url: "/Organisations/GEN0208381/Output/2b916360-8484-4bf8-a7ea-d1902ff29ade/Review"
+    """
+
+    submission_id: str  # UUID of the submission
+    period: str  # Reporting period in "Mon YYYY" format
+    station_name: str  # Name of the station
+    station_id: str  # UUID of the station (if available)
+    schemes: list[str]  # List of schemes: "RO", "REGO", etc.
+    country: str  # Country location
+    technology_group: str  # Technology classification
+    status: str  # Submission status
+    url: str  # Relative URL to view/review submission
+
+
+@dataclass
+class StationOutputSubmissionList(RERModel):
+    """Collection of station output submissions for an organisation.
+
+    Example:
+        organisation_id: "GEN0208381"
+        submissions: [StationOutputSubmission, ...]
+    """
+
+    organisation_id: str  # Parent organisation ID
+    submissions: list[StationOutputSubmission]  # List of output submissions
