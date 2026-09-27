@@ -489,7 +489,9 @@ class StationOutputSubmission(RERModel):
         period: Reporting period in "Mon YYYY" format (e.g., "Aug 2026")
         station_name: Name of the station
         station_id: UUID of the station (if available, else empty string)
-        schemes: List of schemes (e.g., ["RO", "REGO"])
+        schemes: List of schemes (e.g., ["RO", "REGO"], ["REGO", "ROO-FIT"], or ["REGO"])
+                   Common values: "RO" (Renewables Obligation), "REGO" (Renewables Energy Guarantees of Origin),
+                   "ROO-FIT" (Renewables Obligation Order - Feed-in Tariff)
         country: Country location (e.g., "England", "Scotland")
         technology_group: Technology classification (e.g., "Fuelled", "Wind")
         status: Submission status (e.g., "In review", "Pending", "Approved", "Draft")
