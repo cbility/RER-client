@@ -12,7 +12,7 @@ import re  # for pagination parsing
 import math  # for pagination calculation
 
 from rer_client import parsing as rer_parsing
-from rer_client.models import OrganisationOutputSubmissionList
+from rer_client.models import OrganisationOutputSubmissionGroup
 
 # endregion imports
 
@@ -176,7 +176,7 @@ class RERClient:
     def get_organisation_output_data(
         self,
         organisation_id: str,
-    ) -> OrganisationOutputSubmissionList:
+    ) -> OrganisationOutputSubmissionGroup:
         """GET /Organisations/{organisationId}/Output - Returns all station output submissions.
 
         Fetches all output submissions for an organisation across all pages.
@@ -224,7 +224,7 @@ class RERClient:
                 # No more pages or error fetching
                 break
 
-        return OrganisationOutputSubmissionList(
+        return OrganisationOutputSubmissionGroup(
             organisation_id=organisation_id, submissions=all_submissions
         )
 
@@ -304,7 +304,7 @@ class RERClient:
 
     def get_organisation_certificates(
         self, organisation_id: str
-    ) -> rer_parsing.OrganisationCertificates:
+    ) -> rer_parsing.OrganisationCertificateGroup:
         """GET /Organisations/{organisationId}/Certificates - Returns certificates overview."""
         response = self._request(f"Organisations/{organisation_id}/Certificates")
         return rer_parsing._parse_certificates_overview(response.text, organisation_id)

@@ -402,7 +402,7 @@ class CertificateTypeSummary(RERModel):
 
 
 @dataclass
-class OrganisationCertificates(RERModel):
+class OrganisationCertificateGroup(RERModel):
     """Overview of all certificates for an organisation.
 
     Example:
@@ -498,7 +498,6 @@ class StationOutputSubmission(RERModel):
         period: Reporting period in "Mon YYYY" format (e.g., "Aug 2026")
         period_month_start: Start date of the reporting month as datetime
         station_name: Name of the station
-        station_id: UUID of the station (if available, else empty string)
         schemes: List of schemes (e.g., ["RO", "REGO"], ["REGO", "ROO-FIT"], or ["REGO"])
                    Common values: "RO" (Renewables Obligation), "REGO" (Renewables Energy Guarantees of Origin),
                    "ROO-FIT" (Renewables Obligation Order - Feed-in Tariff)
@@ -511,7 +510,6 @@ class StationOutputSubmission(RERModel):
         submission_id: "2b916360-8484-4bf8-a7ea-d1902ff29ade"
         period: "Aug 2026"
         station_name: "Villa Nursery"
-        station_id: ""
         schemes: ["RO", "REGO"]
         country: "England"
         technology_group: "Fuelled"
@@ -523,7 +521,6 @@ class StationOutputSubmission(RERModel):
     period: str  # Reporting period in "Mon YYYY" format
     period_month_start: datetime  # Start date of the reporting month as datetime
     station_name: str  # Name of the station
-    station_id: str  # UUID of the station (if available)
     schemes: list[str]  # List of schemes: "RO", "REGO", etc.
     country: str  # Country location
     technology_group: str  # Technology classification
@@ -532,7 +529,7 @@ class StationOutputSubmission(RERModel):
 
 
 @dataclass
-class OrganisationOutputSubmissionList(RERModel):
+class OrganisationOutputSubmissionGroup(RERModel):
     """Collection of station output submissions for an organisation.
 
     Example:

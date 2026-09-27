@@ -13,7 +13,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from rer_client.models import (
-    OrganisationCertificates,
+    OrganisationCertificateGroup,
     OrganisationDetail,
     OrganisationStation,
     OrganisationSummary,
@@ -166,6 +166,9 @@ class RERSmartSuiteClient(SmartSuiteClient):
         oldest_ROCs_not_issued = None
 
         asc_output_periods = sorted(output_periods, key=lambda x: x.period_month_start)
+        logger.debug(
+            f"Calculating certificate statistics for {rer_station.station_name} using {len(asc_output_periods)} output periods."
+        )
         for output_period in asc_output_periods:
             if "RO" in output_period.schemes:
                 if output_period.status != "Approved":

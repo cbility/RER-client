@@ -11,12 +11,12 @@ import requests
 from rer_client import RERClient
 from rer_client.models import (
     CertificateTypeSummary,
-    OrganisationCertificates,
+    OrganisationCertificateGroup,
     OrganisationStation,
     OrganisationStationList,
     OrganisationSummary,
     OrganisationDetail,
-    OrganisationOutputSubmissionList,
+    OrganisationOutputSubmissionGroup,
     StationOutputSubmission,
     User,
 )
@@ -209,7 +209,9 @@ class RERScraperService:
             for org in organisations
         ]
 
-        logger.info(f"Fetched data for{len(organisation_stations_lists)} organisations")
+        logger.info(
+            f"Fetched data for {len(organisation_stations_lists)} organisations"
+        )
 
         return (
             user,
@@ -242,7 +244,10 @@ class RERScraperService:
         insert_orgs = []
         logger.info(f"Processing {len(organisations)} organisations")
         for org in organisations:
-            logger.debug(f"   {org}")
+            logger.info(
+                f"  Processing organisation: {org.org_summary.organisation_id} {org.org_summary.name}"
+            )
+            logger.debug(f"Full organisation object: {org}")
             ss_org_record = next(
                 (
                     ss_org
@@ -269,22 +274,20 @@ class RERScraperService:
                         org.org_summary, org.org_detail, ss_user_record_id
                     )
                 )
+        logger.info(f"{len(update_orgs)} organisations to UPDATE")
+        for org in update_orgs:
+            logger.debug(f"{json.dumps(org, indent=2)}")
 
-        if update_orgs:
-            logger.info(f"{len(update_orgs)} organisations to UPDATE")
-            for org in update_orgs:
-                logger.debug(f"  {org}")
+        logger.info(f"{len(insert_orgs)} organisations to CREATE")
 
-        if insert_orgs:
-            logger.info(f"{len(insert_orgs)} organisations to CREATE")
-            for org in insert_orgs:
-                logger.debug(f"  {org}")
+        for org in insert_orgs:
+            logger.debug(f"{json.dumps(org, indent=2)}")
 
         if not self.dry_run:
             self.smartsuite.update_organisations(update_orgs)
             self.smartsuite.create_organisations(insert_orgs)
         else:
-            logger.warning("Dry run mode: skipping SmartSuite writes")
+            logger.warning("Dry run mode: skipping SmartSuite organisation writes")
 
     def update_rer_user(self, user: User) -> None:
         logger.info(f"Updating RER user: {user}")
@@ -295,9 +298,9 @@ class RERScraperService:
 
     def update_rer_stations(
         self,
-        organisation_stations: list[OrganisationStationList],
-        organisation_certificates: list[OrganisationCertificates],
-        organisation_output_periods_groups: list[OrganisationOutputSubmissionList],
+        organisation_station_groups: list[OrganisationStationList],
+        organisation_certificates: list[OrganisationCertificateGroup],
+        organisation_output_periods_groups: list[OrganisationOutputSubmissionGroup],
         run_start: datetime,
     ):
         """
@@ -305,18 +308,18 @@ class RERScraperService:
         Updates records if they already exist, otherwise creates new records.
         Certificate information is used to create statistics and is stored at the station level.
         """
+        # spit records into updates and inserts
+        update_stations = []
+        insert_stations = []
+        logger.info(
+            f"Processing stations for {len(organisation_station_groups)} organisations"
+        )
 
+        # get existing station records from SmartSuite
         ss_stations = [] if self.dry_run else self.smartsuite.get_current_stations()
 
-        @dataclass
-        class OrganisationInfo:
-            organisation_stations: list[OrganisationStation]
-            organisation_certificates: list[CertificateTypeSummary]
-            organisation_output_periods: list[StationOutputSubmission]
-
-        org_info: dict[str, OrganisationInfo] = {}
-        for org_station_group in organisation_stations:
-            certificate_summary = next(
+        for org_station_group in organisation_station_groups:
+            org_certificate_summary = next(
                 (
                     cert_group
                     for cert_group in organisation_certificates
@@ -332,31 +335,17 @@ class RERScraperService:
                 ),
             )
 
-            org_info[org_station_group.organisation_id] = OrganisationInfo(
-                organisation_stations=org_station_group.stations,
-                organisation_certificates=certificate_summary.summaries,
-                organisation_output_periods=org_output_periods.submissions,
-            )
-
-        # spit records into updates and inserts
-        update_stations = []
-        insert_stations = []
-        logger.info(
-            f"Processing stations for {len(organisation_stations)} organisations"
-        )
-
-        for organisation_id, organisation_data in org_info.items():
-
             logger.info(
-                f"Processing {len(organisation_data.organisation_stations)} stations for organisation {organisation_id}"
+                f"Processing {len(org_station_group.stations)} stations for organisation {org_station_group.organisation_id}"
             )
 
-            for station in organisation_data.organisation_stations:
+            for station in org_station_group.stations:
                 logger.debug(f"   {station}")
+                # Match by station_name since station_id is not available in output submissions view
                 station_output_periods = [
                     op
-                    for op in organisation_data.organisation_output_periods
-                    if op.station_id == station.station_id
+                    for op in org_output_periods.submissions
+                    if op.station_name == station.station_name
                 ]
                 ss_station_record = next(
                     (
@@ -389,21 +378,19 @@ class RERScraperService:
                         )
                     )
 
-            if update_stations:
-                logger.info(f"{len(update_stations)} stations to UPDATE")
-                for station in update_stations:
-                    logger.debug(f"  {station}")
+        logger.info(f"{len(update_stations)} stations to UPDATE")
+        for station in update_stations:
+            logger.debug(f"{json.dumps(station, indent=2)}")
 
-            if insert_stations:
-                logger.info(f"{len(insert_stations)} stations to CREATE")
-                for station in insert_stations:
-                    logger.debug(f"  {station}")
+        logger.info(f"{len(insert_stations)} stations to CREATE")
+        for station in insert_stations:
+            logger.debug(f"{json.dumps(station, indent=2)}")
 
-            if not self.dry_run:
-                self.smartsuite.update_stations(update_stations)
-                self.smartsuite.create_stations(insert_stations)
-            else:
-                logger.warning("Dry run mode: skipping SmartSuite writes")
+        if not self.dry_run:
+            self.smartsuite.update_stations(update_stations)
+            self.smartsuite.create_stations(insert_stations)
+        else:
+            logger.warning("Dry run mode: skipping SmartSuite station writes")
 
     # endregion data refresh helpers
 

@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict
 import pytest
 
-from rer_client.models import OrganisationCertificates
+from rer_client.models import OrganisationCertificateGroup
 
 ORG_ID = "GEN0212970"  # Updated to match cached data
 
@@ -19,7 +19,7 @@ def overview(rer):
 
 
 def test_returns_dict(overview):
-    assert isinstance(overview, OrganisationCertificates)
+    assert isinstance(overview, OrganisationCertificateGroup)
 
 
 def test_organisation_id(overview):

@@ -7,7 +7,7 @@ from rer_client.models import (
     CertificateBreakdownItem,
     CertificateHistory,
     CertificateHistoryMonth,
-    OrganisationCertificates,
+    OrganisationCertificateGroup,
     CertificateTypeSummary,
     OrganisationContact,
     OrganisationDetail,
@@ -27,7 +27,7 @@ from rer_client.models import (
     StationDeclarationTaskList,
     StationDetail,
     StationOutputSubmission,
-    OrganisationOutputSubmissionList,
+    OrganisationOutputSubmissionGroup,
     User,
 )
 
@@ -392,7 +392,7 @@ def _parse_find_organisation(html: str) -> Optional[OrganisationSearchResult]:
 
 def _parse_certificates_overview(
     html: str, organisation_id: str
-) -> OrganisationCertificates:
+) -> OrganisationCertificateGroup:
     tree = HTMLParser(html)
 
     desc_el = tree.css_first(".ofgem-rer-stat__description")
@@ -449,7 +449,7 @@ def _parse_certificates_overview(
             )
         )
 
-    return OrganisationCertificates(
+    return OrganisationCertificateGroup(
         organisation_id=organisation_id,
         balance_period=balance_period,
         summaries=summaries,
@@ -536,7 +536,7 @@ def _parse_certificate_history(
 
 def _parse_station_output_submissions(
     html: str, organisation_id: str
-) -> OrganisationOutputSubmissionList:
+) -> OrganisationOutputSubmissionGroup:
     """Parse station output submissions from /Organisations/{organisationId}/Output.
 
     Args:
@@ -599,7 +599,6 @@ def _parse_station_output_submissions(
                     cells[0].text(strip=True), "%b %Y"
                 ),
                 station_name=cells[1].text(strip=True),
-                station_id="",  # Not available in this view
                 schemes=schemes,
                 country=cells[3].text(strip=True),
                 technology_group=cells[4].text(strip=True),
@@ -608,7 +607,7 @@ def _parse_station_output_submissions(
             )
         )
 
-    return OrganisationOutputSubmissionList(
+    return OrganisationOutputSubmissionGroup(
         organisation_id=organisation_id,
         submissions=submissions,
     )
