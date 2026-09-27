@@ -197,25 +197,31 @@ class RERSmartSuiteClient(SmartSuiteClient):
             "sxyont8b": rego_scheme_status,  # REGO scheme status
             "secb786709": rer_station.country,  #  country
             "secb786709": rer_station.technology_group,  # technology
-            "s9c6cfc3d3": {"date": update_time.isoformat()},  # statistics last updated
+            "s9c6cfc3d3": {
+                "date": update_time.isoformat(),
+                "include_time": True,
+            },  # statistics last updated
             "sacbaf74ee": {
                 "date": (
                     last_submission_date.isoformat() if last_submission_date else None
-                )
+                ),
+                "include_time": False,
             },  # Last Submission
             "sqih0nxo": {
                 "date": (
                     oldest_REGOs_not_issued.isoformat()
                     if oldest_REGOs_not_issued
                     else None
-                )
+                ),
+                "include_time": False,
             },  # oldest regos not issued
             "sd2f8e15e8": {
                 "date": (
                     oldest_ROCs_not_issued.isoformat()
                     if oldest_ROCs_not_issued
                     else None
-                )
+                ),
+                "include_time": False,
             },  # oldest rocs not issued
         }
         return ss_station
