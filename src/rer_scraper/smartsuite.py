@@ -21,6 +21,7 @@ from rer_client.models import (
     User,
 )
 from rer_scraper.models import ScraperOperations
+from rer_scraper.service import RERStation
 
 logger = logging.getLogger(__name__)
 
@@ -148,14 +149,14 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
     def map_station(
         self,
-        rer_station: OrganisationStation,
+        rer_station: RERStation,
         output_periods: list[StationOutputSubmission],
         # certificates: list[CertificatesOverview], # TODO: parse certificate/output period info
         update_time: datetime,
     ):
         ro_scheme_status = "Not Set"
         rego_scheme_status = "Not Set"
-        for scheme in rer_station.scheme_statuses:
+        for scheme in rer_station.station_summary.scheme_statuses:
             if scheme.scheme == "RO":
                 ro_scheme_status = scheme.status
             elif scheme.scheme == "REGO":
@@ -167,7 +168,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
         asc_output_periods = sorted(output_periods, key=lambda x: x.period_month_start)
         logger.debug(
-            f"Calculating certificate statistics for {rer_station.station_name} using {len(asc_output_periods)} output periods."
+            f"Calculating certificate statistics for {rer_station.station_summary.station_name} using {len(asc_output_periods)} output periods."
         )
         for output_period in asc_output_periods:
             if "RO" in output_period.schemes:
@@ -191,12 +192,12 @@ class RERSmartSuiteClient(SmartSuiteClient):
             last_submission_date = output_period.period_month_start
 
         ss_station = {
-            "sb2a2fadfb": rer_station.station_id,  # station id
-            "sde6082ea0": rer_station.station_name,  # station name
+            "sb2a2fadfb": rer_station.station_summary.station_id,  # station id
+            "s67f82378a": rer_station.station_summary.station_name,  # station name
             "sf6261a94b": ro_scheme_status,  # RO scheme status
             "sxyont8b": rego_scheme_status,  # REGO scheme status
-            "secb786709": rer_station.country,  #  country
-            "secb786709": rer_station.technology_group,  # technology
+            "s556273d3c": rer_station.station_summary.country,  #  country
+            "secb786709": rer_station.station_summary.technology_group,  # technology
             "s9c6cfc3d3": {
                 "date": update_time.isoformat(),
                 "include_time": True,
@@ -223,6 +224,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
                 ),
                 "include_time": False,
             },  # oldest rocs not issued
+            # TODO: add address
         }
         return ss_station
 

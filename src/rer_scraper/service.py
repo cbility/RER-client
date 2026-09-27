@@ -3,6 +3,7 @@ import json
 from dataclasses import asdict, dataclass
 import os
 from typing import Any, Callable, Protocol
+from rer_client.models import StationDetail
 from datetime import datetime
 from unittest import result
 from itertools import chain  # for flattening nested lists
@@ -49,6 +50,15 @@ class REROrganisation:
 
     org_summary: OrganisationSummary
     org_detail: OrganisationDetail
+
+
+@dataclass
+class RERStation:
+    """Container for organisation station and related output periods"""
+
+    organisation_id: str
+    station_summary: OrganisationStation
+    station_detail: StationDetail
 
 
 class RetryInvoker(Protocol):
@@ -192,10 +202,20 @@ class RERScraperService:
             organisations.append(REROrganisation(org_summary, org_detail))
 
         # logger.debug(f"Organisations: {organisations}")
-        organisation_stations_lists = [
-            rer.get_organisation_stations(org.org_summary.organisation_id)
-            for org in organisations
-        ]
+        organisation_stations_lists: list[RERStation] = []
+        for org in organisations:
+            org_stations_group = rer.get_organisation_stations(
+                org.org_summary.organisation_id
+            )
+            for station in org_stations_group.stations:
+                station_detail = rer.get_station(station.station_id)
+                organisation_stations_lists.append(
+                    RERStation(
+                        organisation_id=org.org_summary.organisation_id,
+                        station_summary=station,
+                        station_detail=station_detail,
+                    )
+                )
 
         # logger.debug(f"Stations: {organisation_stations}")
         organisation_certificates = [
@@ -303,7 +323,7 @@ class RERScraperService:
 
     def update_rer_stations(
         self,
-        organisation_station_groups: list[OrganisationStationList],
+        stations: list[RERStation],
         organisation_certificates: list[OrganisationCertificateGroup],
         organisation_output_periods_groups: list[OrganisationOutputSubmissionGroup],
         run_start: datetime,
@@ -316,19 +336,17 @@ class RERScraperService:
         # spit records into updates and inserts
         update_stations = []
         insert_stations = []
-        logger.info(
-            f"Processing stations for {len(organisation_station_groups)} organisations"
-        )
+        logger.info(f"Processing {len(stations)} stations")
 
         # get existing station records from SmartSuite
         ss_stations = [] if self.dry_run else self.smartsuite.get_current_stations()
 
-        for org_station_group in organisation_station_groups:
+        for station in stations:
             org_certificate_summary = next(
                 (
                     cert_group
                     for cert_group in organisation_certificates
-                    if cert_group.organisation_id == org_station_group.organisation_id
+                    if cert_group.organisation_id == station.organisation_id
                 ),
             )
             org_output_periods = next(
@@ -336,52 +354,48 @@ class RERScraperService:
                     organisation_period_group
                     for organisation_period_group in organisation_output_periods_groups
                     if organisation_period_group.organisation_id
-                    == org_station_group.organisation_id
+                    == station.organisation_id
                 ),
             )
 
-            logger.info(
-                f"Processing {len(org_station_group.stations)} stations for organisation {org_station_group.organisation_id}"
+            logger.debug(f"Processing station: {station}")
+            # Match by station_name since station_id is not available in output submissions view
+            station_output_periods = [
+                op
+                for op in org_output_periods.submissions
+                if op.station_name
+                == station.station_summary.station_name  # station ID not available from output data page
+            ]
+            ss_station_record = next(
+                (
+                    ss_station
+                    for ss_station in ss_stations
+                    if self.smartsuite.get_station_id(ss_station)
+                    == station.station_summary.station_id
+                ),
+                None,
             )
-
-            for station in org_station_group.stations:
-                logger.debug(f"   {station}")
-                # Match by station_name since station_id is not available in output submissions view
-                station_output_periods = [
-                    op
-                    for op in org_output_periods.submissions
-                    if op.station_name == station.station_name
-                ]
-                ss_station_record = next(
-                    (
-                        ss_station
-                        for ss_station in ss_stations
-                        if self.smartsuite.get_station_id(ss_station)
-                        == station.station_id
-                    ),
-                    None,
-                )
-                if ss_station_record is not None:
-                    update_stations.append(
-                        {
-                            **self.smartsuite.map_station(
-                                rer_station=station,
-                                output_periods=station_output_periods,
-                                # certificates=certificates,
-                                update_time=run_start,
-                            ),
-                            "id": ss_station_record["id"],
-                        }
-                    )
-                else:
-                    insert_stations.append(
-                        self.smartsuite.map_station(
+            if ss_station_record is not None:
+                update_stations.append(
+                    {
+                        **self.smartsuite.map_station(
                             rer_station=station,
                             output_periods=station_output_periods,
                             # certificates=certificates,
                             update_time=run_start,
-                        )
+                        ),
+                        "id": ss_station_record["id"],
+                    }
+                )
+            else:
+                insert_stations.append(
+                    self.smartsuite.map_station(
+                        rer_station=station,
+                        output_periods=station_output_periods,
+                        # certificates=certificates,
+                        update_time=run_start,
                     )
+                )
 
         logger.info(f"{len(update_stations)} stations to UPDATE")
         for station in update_stations:
