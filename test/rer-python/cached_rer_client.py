@@ -129,15 +129,35 @@ class CachedRERClient(RERClient):
                 else:
                     cache_dir = f"_{endpoint_type.lower()}"
 
-                # Check if there's a station ID: "Organisations/GEN123/Stations/STATION-ID"
-                if len(parts) >= 4 and endpoint_type == "Stations":
-                    station_id = parts[3]
-                    return (
-                        self.cache_dir
-                        / org_id
-                        / f"_stations_{station_id}"
-                        / "response.html"
-                    )
+                # Check if there's a station ID: "Organisations/GEN123/Stations/STATION-ID" or "Organisations/Stations/STATION-ID"
+                if endpoint_type == "Stations" and len(parts) >= 3:
+                    # Detect format: "Organisations/Stations/STATION-ID" vs "Organisations/GEN123/Stations/STATION-ID"
+                    if parts[1] == "Stations":
+                        # Format: Organisations/Stations/STATION-ID (station detail page)
+                        station_id = parts[2]
+                        # Look for station detail in any organisation directory
+                        for org_dir in self.cache_dir.iterdir():
+                            if org_dir.is_dir() and org_dir.name.startswith("GEN"):
+                                station_path = (
+                                    org_dir
+                                    / f"_stations_{station_id}"
+                                    / "response.html"
+                                )
+                                if station_path.exists():
+                                    return station_path
+                        # Fallback: try to find in _stations directory at root
+                        return (
+                            self.cache_dir / f"_stations_{station_id}" / "response.html"
+                        )
+                    elif len(parts) >= 4:
+                        # Format: Organisations/GEN123/Stations/STATION-ID
+                        station_id = parts[3]
+                        return (
+                            self.cache_dir
+                            / org_id
+                            / f"_stations_{station_id}"
+                            / "response.html"
+                        )
 
                 return self.cache_dir / org_id / cache_dir / "response.html"
 
