@@ -5,6 +5,7 @@ import os
 from typing import Any, Callable, Protocol
 from rer_client.models import StationDetail
 from datetime import datetime
+import pytz
 from unittest import result
 from itertools import chain  # for flattening nested lists
 
@@ -161,7 +162,7 @@ class RERScraperService:
     # region orchestration
 
     def run(self, schedule_retry: bool = True) -> tuple[int, ScraperResult | None]:
-        run_start = datetime.now()
+        run_start = datetime.now(tz=pytz.timezone("Europe/London"))
         operations = self.smartsuite.get_operations(run_start)
         if len(operations) == 0:
             return 204, None  # successful run but no tasks scheduled
@@ -379,7 +380,8 @@ class RERScraperService:
                 update_stations.append(
                     {
                         **self.smartsuite.map_station(
-                            rer_station=station,
+                            rer_station_summary=station.station_summary,
+                            rer_station_detail=station.station_detail,
                             output_periods=station_output_periods,
                             # certificates=certificates,
                             update_time=run_start,
@@ -390,7 +392,8 @@ class RERScraperService:
             else:
                 insert_stations.append(
                     self.smartsuite.map_station(
-                        rer_station=station,
+                        rer_station_summary=station.station_summary,
+                        rer_station_detail=station.station_detail,
                         output_periods=station_output_periods,
                         # certificates=certificates,
                         update_time=run_start,
