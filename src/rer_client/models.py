@@ -325,7 +325,7 @@ class StationDetail(RERModel):
         total_installed_capacity: "49 kW"
         technology_group: "Fuelled"
         prelim_approval: ""
-        address: " Glenskinno Farm Montrose DD10 9LG Scotland "
+        address: ["Glenskinno Farm", "Montrose", "DD10 9LG", "Scotland"]
         grid_reference: "NO682604"
         application_date: "05/09/2016"
         declared_net_capacity: "48.638 kW"
@@ -350,7 +350,7 @@ class StationDetail(RERModel):
     total_installed_capacity: str  # Total capacity with units, e.g., "49 kW"
     technology_group: str  # Technology classification
     prelim_approval: str  # Preliminary approval status (may be empty)
-    address: str  # Full station address
+    address: list[str]  # Address lines (street, city, [region,] postcode, country)
     grid_reference: str  # UK grid reference, e.g., "NO682604"
     application_date: str  # Date application submitted (DD/MM/YYYY)
     declared_net_capacity: str  # Net capacity with units, e.g., "48.638 kW"

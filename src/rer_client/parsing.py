@@ -305,7 +305,15 @@ def _parse_station(html: str, station_id: str) -> StationDetail:
     info: dict[str, str] = {}
     for dl in tree.css("dl"):
         for dt, dd in zip(dl.css("dt"), dl.css("dd")):
-            info[dt.text(strip=True)] = dd.text(separator=" ", strip=True)
+            key = dt.text(strip=True)
+            # For address, preserve line breaks by splitting on <br/> tags
+            if key == "Address":
+                # Use selectolax's iter() to get all text nodes
+                # The <br/> tags create separate text nodes
+                address_text = dd.text(separator="\n", strip=True)
+                info[key] = address_text
+            else:
+                info[key] = dd.text(separator=" ", strip=True)
 
     # Scheme accreditations table (TABLE 0)
     scheme_accreditations: list[SchemeAccreditation] = []
@@ -340,6 +348,16 @@ def _parse_station(html: str, station_id: str) -> StationDetail:
                     )
                 )
 
+    # Parse address lines - keep all lines as they appear in HTML
+    address_lines = []
+    if info.get("Address"):
+        address_lines = [line.strip() for line in info["Address"].split("\n")]
+        # Remove empty strings from start and end
+        while address_lines and not address_lines[0]:
+            address_lines.pop(0)
+        while address_lines and not address_lines[-1]:
+            address_lines.pop()
+
     return StationDetail(
         station_id=station_id,
         station_name=station_name,
@@ -349,7 +367,7 @@ def _parse_station(html: str, station_id: str) -> StationDetail:
         total_installed_capacity=info.get("Total installed capacity (TIC)", ""),
         technology_group=info.get("Technology group", ""),
         prelim_approval=info.get("Prelim approval", ""),
-        address=info.get("Address", ""),
+        address=address_lines,
         grid_reference=info.get("Grid reference", ""),
         application_date=info.get("Application date", ""),
         declared_net_capacity=info.get("Declared net capacity", ""),

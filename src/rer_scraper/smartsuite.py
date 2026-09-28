@@ -224,7 +224,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
                 ),
                 "include_time": False,
             },  # oldest rocs not issued
-            # TODO: add address
+            "s4de120c7e": {"location_address": rer_station.station_detail.address},
         }
         return ss_station
 

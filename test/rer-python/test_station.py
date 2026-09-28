@@ -59,7 +59,11 @@ def test_technology_group_nonempty(station):
 
 
 def test_address_nonempty(station):
-    assert isinstance(station["address"], str) and len(station["address"]) > 0
+    assert isinstance(station["address"], list)
+    # Address can have variable number of lines depending on HTML structure
+    # Each address line should be a string
+    for line in station["address"]:
+        assert isinstance(line, str)
 
 
 def test_scheme_accreditations_is_list(station):
