@@ -359,7 +359,8 @@ class RERScraperService:
                 ),
             )
 
-            logger.debug(f"Processing station: {station}")
+            logger.info(f"Processing station: {station.station_summary.station_name}")
+            logger.debug(f"{station}")
             # Match by station_name since station_id is not available in output submissions view
             station_output_periods = [
                 op
