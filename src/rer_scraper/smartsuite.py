@@ -121,8 +121,13 @@ class RERSmartSuiteClient(SmartSuiteClient):
         )
         return current_organisations
 
-    def get_organisation_id(self, organisation_record: dict):
-        return organisation_record.get("s44395f753")
+    def get_organisation_id(self, organisation_record: dict) -> str:
+        org_id = organisation_record.get("s44395f753")
+        if org_id is None:
+            raise ValueError("Organisation ID is missing from the record.")
+        if not isinstance(org_id, str):
+            raise TypeError("Organisation ID must be a string.")
+        return org_id
 
     def get_station_id(self, station_record: dict):
         return station_record.get("sb2a2fadfb")
@@ -172,6 +177,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
         output_periods: list[StationOutputSubmission],
         # certificates: list[CertificatesOverview], # TODO: parse certificate/output period info
         update_time: datetime,
+        smartsuite_organisation_id: str,
     ):
         ro_scheme_status = "Not Set"
         rego_scheme_status = "Not Set"
@@ -260,6 +266,26 @@ class RERSmartSuiteClient(SmartSuiteClient):
                 "location_latitude": latitude,
                 "location_longitude": longitude,
             },
+            "sb9c2949f6": {
+                "date": datetime.strptime(
+                    rer_station_detail.application_date, "%d/%m/%Y"
+                ).isoformat(),
+                "include_time": False,
+            },  # Application date
+            "s3c8a38ff2": {
+                "date": datetime.strptime(
+                    rer_station_detail.commissioning_date, "%d/%m/%Y"
+                ).isoformat(),
+                "include_time": False,
+            },  # Commissioning date
+            "s527b8570a": rer_station_detail.grid_reference,  # Grid reference
+            "s43a238048": float(
+                rer_station_detail.total_installed_capacity.split(" kW")[0]
+            ),  # TIC
+            "s318a1bd8a": float(
+                rer_station_detail.declared_net_capacity.split(" kW")[0]
+            ),  # DNC
+            "s3db6ec159": [smartsuite_organisation_id],  # Organisation linked record
         }
         return ss_station
 

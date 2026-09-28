@@ -60,6 +60,7 @@ class RERStation:
     organisation_id: str
     station_summary: OrganisationStation
     station_detail: StationDetail
+    smartsuite_organisation_id: str | None = None
 
 
 class RetryInvoker(Protocol):
@@ -180,7 +181,18 @@ class RERScraperService:
                 self.get_current_data(rer)
             )
             self.update_rer_user(user)
-            self.update_rer_organisations(organisations, self.ss_login_record_id)
+            org_id_map = self.update_rer_organisations(
+                organisations, self.ss_login_record_id
+            )
+            # add new and existing smartsuite org ids to stations
+            for station in stations:
+                ss_org_id = org_id_map.get(station.organisation_id)
+                if ss_org_id is None:
+                    raise ValueError(
+                        f"SmartSuite organisation ID not found for station {station.station_summary.station_name} with organisation ID {station.organisation_id}"
+                    )
+                station.smartsuite_organisation_id = ss_org_id
+
             self.update_rer_stations(stations, certificates, output_periods, run_start)
 
         if "transfer_certificates" in operations:
@@ -250,7 +262,7 @@ class RERScraperService:
         self,
         organisations: list[REROrganisation],
         ss_user_record_id: str,
-    ):
+    ) -> dict[str, str]:
         """
         Updates organisation records on SmartSuite with the passed details.
         Updates records if they already exist, otherwise creates new records.
@@ -305,11 +317,22 @@ class RERScraperService:
         for org in insert_orgs:
             logger.debug(f"{json.dumps(org, indent=2)}")
 
+        created_orgs = []
         if not self.dry_run:
             self.smartsuite.update_organisations(update_orgs)
-            self.smartsuite.create_organisations(insert_orgs)
+            created_orgs = self.smartsuite.create_organisations(insert_orgs)
+            org_id_map = {
+                self.smartsuite.get_organisation_id(org): org["id"]
+                for org in update_orgs + created_orgs
+            }
         else:
             logger.warning("Dry run mode: skipping SmartSuite organisation writes")
+            org_id_map = {
+                self.smartsuite.get_organisation_id(org): "dry_run"
+                for org in update_orgs + insert_orgs
+            }
+
+        return org_id_map
 
     def update_rer_user(self, user: User) -> None:
         logger.info(f"Updating RER user: {user}")
@@ -378,9 +401,14 @@ class RERScraperService:
                 None,
             )
             if ss_station_record is not None:
+                if not station.smartsuite_organisation_id:
+                    raise ValueError(
+                        f"SmartSuite organisation ID missing when attempting to update station {station.station_summary.station_name}"
+                    )
                 update_stations.append(
                     {
                         **self.smartsuite.map_station(
+                            smartsuite_organisation_id=station.smartsuite_organisation_id,
                             rer_station_summary=station.station_summary,
                             rer_station_detail=station.station_detail,
                             output_periods=station_output_periods,
@@ -391,8 +419,13 @@ class RERScraperService:
                     }
                 )
             else:
+                if not station.smartsuite_organisation_id:
+                    raise ValueError(
+                        f"SmartSuite organisation ID missing when attempting to insert station {station.station_summary.station_name}"
+                    )
                 insert_stations.append(
                     self.smartsuite.map_station(
+                        smartsuite_organisation_id=station.smartsuite_organisation_id,
                         rer_station_summary=station.station_summary,
                         rer_station_detail=station.station_detail,
                         output_periods=station_output_periods,
