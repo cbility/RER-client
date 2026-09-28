@@ -600,12 +600,10 @@ def _parse_station_output_submissions(
         # Extract schemes from third cell (may contain multiple schemes separated by <br/>)
         schemes: list[str] = []
         scheme_cell = cells[2]
-        # Get all text nodes separated by <br/> tags
-        scheme_texts = [
-            node.text(strip=True) for node in scheme_cell.iter(include_text=True)
-        ]
-        for scheme_text in scheme_texts:
-            scheme = scheme_text.strip()
+        # Get text with <br/> tags converted to newlines, then split
+        scheme_text = scheme_cell.text(separator="\n", strip=True)
+        for scheme in scheme_text.split("\n"):
+            scheme = scheme.strip()
             if scheme:
                 schemes.append(scheme)
 
