@@ -19,6 +19,7 @@ from rer_client.models import (
     OrganisationCertificateGroup,
     OrganisationDetail,
     OrganisationStation,
+    StationDetail,
     OrganisationSummary,
     StationOutputSubmission,
     User,
@@ -214,12 +215,12 @@ class RERSmartSuiteClient(SmartSuiteClient):
         )
 
         ss_station = {
-            "sb2a2fadfb": rer_station.station_summary.station_id,  # station id
-            "s67f82378a": rer_station.station_summary.station_name,  # station name
+            "sb2a2fadfb": rer_station_summary.station_id,  # station id
+            "s67f82378a": rer_station_summary.station_name,  # station name
             "sf6261a94b": ro_scheme_status,  # RO scheme status
             "sxyont8b": rego_scheme_status,  # REGO scheme status
-            "s556273d3c": rer_station.station_summary.country,  #  country
-            "secb786709": rer_station.station_summary.technology_group,  # technology
+            "s556273d3c": rer_station_summary.country,  #  country
+            "secb786709": rer_station_summary.technology_group,  # technology
             "s9c6cfc3d3": {
                 "date": update_time.isoformat(),
                 "include_time": True,
@@ -345,3 +346,6 @@ class RERSmartSuiteClient(SmartSuiteClient):
             logger.error(f"Failed to create stations: {e}")
             logger.error(f"Failed records: {new_stations}")
             raise
+
+
+# endregion class
