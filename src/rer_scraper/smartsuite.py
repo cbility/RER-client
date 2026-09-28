@@ -1,7 +1,10 @@
+# region imports
+
 from __future__ import annotations
 
 import logging
 import os
+import requests  # to convert postcodes to latitude and longitude for smartsuite
 from smartsuite_python import (
     SmartSuiteClient,
     FilterElement,
@@ -21,11 +24,26 @@ from rer_client.models import (
     User,
 )
 from rer_scraper.models import ScraperOperations
-from rer_scraper.service import RERStation
+
+# endregion imports
 
 logger = logging.getLogger(__name__)
 
+# region helpers
 
+
+def convert_postcode_to_coordinates(postcode: str) -> tuple[float, float]:
+    formatted_postcode = postcode.replace(" ", "")
+    data = requests.get(
+        f"https://api.postcodes.io/postcodes/{formatted_postcode}"
+    ).json()
+    return data["result"]["latitude"], data["result"]["longitude"]
+
+
+# endregion helpers
+
+
+# region class
 class RERSmartSuiteClient(SmartSuiteClient):
     """Owns SmartSuite HTTP access and scraper-specific record mappings."""
 
@@ -119,7 +137,6 @@ class RERSmartSuiteClient(SmartSuiteClient):
                 "last_name": " ".join(user.full_name.split(" ")[1:]),
             },
             "sc87fbb8dc": [user.email],
-            # TODO: get user phone number from /Account/EditPhoneNumber
         }
 
     def map_organisation(
@@ -149,14 +166,15 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
     def map_station(
         self,
-        rer_station: RERStation,
+        rer_station_summary: OrganisationStation,
+        rer_station_detail: StationDetail,
         output_periods: list[StationOutputSubmission],
         # certificates: list[CertificatesOverview], # TODO: parse certificate/output period info
         update_time: datetime,
     ):
         ro_scheme_status = "Not Set"
         rego_scheme_status = "Not Set"
-        for scheme in rer_station.station_summary.scheme_statuses:
+        for scheme in rer_station_summary.scheme_statuses:
             if scheme.scheme == "RO":
                 ro_scheme_status = scheme.status
             elif scheme.scheme == "REGO":
@@ -168,7 +186,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
         asc_output_periods = sorted(output_periods, key=lambda x: x.period_month_start)
         logger.debug(
-            f"Calculating certificate statistics for {rer_station.station_summary.station_name} using {len(asc_output_periods)} output periods."
+            f"Calculating certificate statistics for {rer_station_summary.station_name} using {len(asc_output_periods)} output periods."
         )
         for output_period in asc_output_periods:
             if "RO" in output_period.schemes:
@@ -190,6 +208,10 @@ class RERSmartSuiteClient(SmartSuiteClient):
                         + relativedelta(months=1)
                     )
             last_submission_date = output_period.period_month_start
+
+        latitude, longitude = convert_postcode_to_coordinates(
+            rer_station_detail.address[-2]
+        )
 
         ss_station = {
             "sb2a2fadfb": rer_station.station_summary.station_id,  # station id
@@ -224,7 +246,19 @@ class RERSmartSuiteClient(SmartSuiteClient):
                 ),
                 "include_time": False,
             },  # oldest rocs not issued
-            "s4de120c7e": {"location_address": rer_station.station_detail.address},
+            "s4de120c7e": {
+                "location_address": rer_station_detail.address[0],
+                "location_address2": rer_station_detail.address[1],
+                "location_zip": rer_station_detail.address[-2],
+                "location_country": "United Kingdom",
+                "location_city": (
+                    rer_station_detail.address[-3]
+                    if len(rer_station_detail.address) > 4
+                    else None
+                ),
+                "location_latitude": latitude,
+                "location_longitude": longitude,
+            },
         }
         return ss_station
 
