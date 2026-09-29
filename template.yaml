@@ -8,54 +8,22 @@ Description: >
   AWS lambda function for running https://github.com/cbility/RER-client
 
 Parameters:
-  REREmail:
-    Type: String
-    Default: ""
-  RERPassword:
-    Type: String
-    NoEcho: true
-    Default: ""
   GmailTokenJson:
     Type: String
     NoEcho: true
     Default: ""
-  GmailTokenFile:
-    Type: String
-    Default: ""
-  SmartSuiteApiUrl:
-    Type: String
-    Default: "https://app.smartsuite.com/api/v1"
   SmartSuiteApiToken:
     Type: String
     NoEcho: true
     Default: ""
-  SmartSuiteAccountId:
+  SessionAuthApiKeyValue:
     Type: String
+    NoEcho: true
     Default: ""
-  SmartSuiteTableId:
+  ScraperApiKeyValue:
     Type: String
+    NoEcho: true
     Default: ""
-  SmartSuiteRecordId:
-    Type: String
-    Default: ""
-  SmartSuiteCookiesField:
-    Type: String
-    Default: "session_cookies"
-  SmartSuiteRefreshedAtField:
-    Type: String
-    Default: ""
-  SmartSuiteTimeoutSeconds:
-    Type: String
-    Default: "30"
-  RerMfaMaxRetries:
-    Type: String
-    Default: "5"
-  RerMfaWaitSeconds:
-    Type: String
-    Default: "10"
-  PlaywrightHeadless:
-    Type: String
-    Default: "true"
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -88,21 +56,18 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
-          PLAYWRIGHT_HEADLESS: !Ref PlaywrightHeadless
-          RER_MFA_MAX_RETRIES: !Ref RerMfaMaxRetries
-          RER_MFA_WAIT_SECONDS: !Ref RerMfaWaitSeconds
-          RER_EMAIL: !Ref REREmail
-          RER_PASSWORD: !Ref RERPassword
+          PLAYWRIGHT_HEADLESS: "true"
+          RER_MFA_MAX_RETRIES: "5"
+          RER_MFA_WAIT_SECONDS: "10"
           GMAIL_TOKEN_JSON: !Ref GmailTokenJson
-          GMAIL_TOKEN_FILE: !Ref GmailTokenFile
-          SMARTSUITE_API_URL: !Ref SmartSuiteApiUrl
+          SMARTSUITE_API_URL: "https://app.smartsuite.com/api/v1"
           SMARTSUITE_API_TOKEN: !Ref SmartSuiteApiToken
-          SMARTSUITE_ACCOUNT_ID: !Ref SmartSuiteAccountId
-          SMARTSUITE_TABLE_ID: !Ref SmartSuiteTableId
-          SMARTSUITE_RECORD_ID: !Ref SmartSuiteRecordId
-          SMARTSUITE_COOKIES_FIELD: !Ref SmartSuiteCookiesField
-          SMARTSUITE_REFRESHED_AT_FIELD: !Ref SmartSuiteRefreshedAtField
-          SMARTSUITE_TIMEOUT_SECONDS: !Ref SmartSuiteTimeoutSeconds
+          SMARTSUITE_ACCOUNT_ID: "s5ch1upc"
+          SMARTSUITE_TABLE_ID: "652b1faba9847148f31cee2b"
+          SMARTSUITE_RECORD_ID: "6a7f301f54fd4d6f819c1e5f"
+          SMARTSUITE_COOKIES_FIELD: "s5e77b7ce0"
+          SMARTSUITE_REFRESHED_AT_FIELD: ""
+          SMARTSUITE_TIMEOUT_SECONDS: "30"
       Policies:
         - Statement:
             - Effect: Allow
@@ -137,12 +102,12 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          RER_SESSION_AUTH_API_URL: ""
-          RER_SESSION_AUTH_API_KEY_VALUE: ""
-          SMARTSUITE_API_URL: !Ref SmartSuiteApiUrl
+          RER_SESSION_AUTH_API_URL: "https://jofy3f7p43.execute-api.eu-west-2.amazonaws.com/Prod/"
+          RER_SESSION_AUTH_API_KEY_VALUE: !Ref SessionAuthApiKeyValue
+          SMARTSUITE_API_URL: "https://app.smartsuite.com/api/v1"
           SMARTSUITE_API_TOKEN: !Ref SmartSuiteApiToken
-          SMARTSUITE_ACCOUNT_ID: !Ref SmartSuiteAccountId
-          SMARTSUITE_TIMEOUT_SECONDS: !Ref SmartSuiteTimeoutSeconds
+          SMARTSUITE_ACCOUNT_ID: "s5ch1upc"
+          SMARTSUITE_TIMEOUT_SECONDS: "30"
       Policies:
         - Statement:
             - Effect: Allow
@@ -183,12 +148,14 @@ Resources:
     Properties:
       Enabled: true
       Name: RERSessionAuthApiKey
+      Value: !Ref SessionAuthApiKeyValue
 
   RERScraperApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
       Enabled: true
       Name: RERScraperApiKey
+      Value: !Ref ScraperApiKeyValue
 
   RERSessionAuthUsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
