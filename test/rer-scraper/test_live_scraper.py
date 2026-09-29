@@ -109,7 +109,7 @@ def client_factory():
             pytest.fail("No cookies provided to RERClient")
 
         # Create real RERClient that will make live API calls
-        client = RERClient(cookies=cookies)
+        client = RERClient(auth_cookies=cookies)
         logger.info("Created live RERClient (will make real API calls)")
         return client
 
