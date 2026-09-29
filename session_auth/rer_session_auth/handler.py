@@ -13,6 +13,10 @@ from rer_session_auth.auth import (
 )
 from rer_session_auth.store import CookieStore, build_cookie_store
 
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "WARNING").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 log = logging.getLogger(__name__)
 
 
@@ -60,6 +64,9 @@ class SessionCookieService:
     def refresh_cookies(self) -> None:
         log.info("Refreshing RER session cookies")
         refreshed_cookies = sanitize_cookies(browser_authenticate_rer(self.auth_config))
+        log.info(
+            "RER authentication completed; saving %s cookies", len(refreshed_cookies)
+        )
         self.store.save_cookies(refreshed_cookies)
         log.info("Saved refreshed RER session cookies")
 

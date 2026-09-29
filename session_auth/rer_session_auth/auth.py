@@ -199,16 +199,26 @@ def get_gmail_messages(
     token_file: str | None,
 ) -> list[GmailMessage]:
     from googleapiclient.discovery import build  # type: ignore[import-untyped]
+    from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
 
-    credentials = _load_gmail_credentials(token_json=token_json, token_file=token_file)
-    service = build("gmail", "v1", credentials=credentials)
-    query = f'after:{since_date.strftime("%Y/%m/%d")}'
-    results = (
-        service.users()
-        .messages()
-        .list(userId="me", q=query, maxResults=max_messages)
-        .execute()
-    )
+    try:
+        credentials = _load_gmail_credentials(
+            token_json=token_json, token_file=token_file
+        )
+        service = build("gmail", "v1", credentials=credentials, num_retries=3)
+        query = f'after:{since_date.strftime("%Y/%m/%d")}'
+        results = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_messages)
+            .execute()
+        )
+    except HttpError as e:
+        log.error(f"Gmail API error: {e}")
+        raise
+    except Exception as e:
+        log.error(f"Unexpected error loading Gmail messages: {e}")
+        raise
     message_refs = results.get("messages", [])
 
     messages: list[GmailMessage] = []
@@ -248,7 +258,7 @@ def retrieve_mfa_code(
         )
         messages_today = get_gmail_messages(
             since_date=button_clicked_after.date(),
-            max_messages=10,
+            max_messages=50,
             token_json=token_json,
             token_file=token_file,
         )
@@ -266,6 +276,9 @@ def retrieve_mfa_code(
 
             match = re.search(r"verification code (\d{6})", body_text)
             if match:
+                log.info(
+                    "Found a matching RER MFA email on attempt %s", retry_number + 1
+                )
                 return match.group(1)
 
         log.warning(
@@ -342,8 +355,10 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
 
             page.wait_for_url("https://rer.ofgem.gov.uk/**", timeout=300000)
             cookies = page.context.cookies()
-            return sanitize_cookies(
+            sanitized_cookies = sanitize_cookies(
                 {cookie.get("name", ""): cookie.get("value", "") for cookie in cookies}
             )
+            log.info("RER login produced %s cookies", len(sanitized_cookies))
+            return sanitized_cookies
         finally:
             browser.close()

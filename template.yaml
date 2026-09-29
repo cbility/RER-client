@@ -87,6 +87,7 @@ Resources:
         - x86_64
       Environment:
         Variables:
+          LOG_LEVEL: INFO
           PLAYWRIGHT_HEADLESS: !Ref PlaywrightHeadless
           RER_MFA_MAX_RETRIES: !Ref RerMfaMaxRetries
           RER_MFA_WAIT_SECONDS: !Ref RerMfaWaitSeconds
@@ -157,16 +158,6 @@ Resources:
             Auth:
               ApiKeyRequired: true
 
-  RERClientApiUsagePlan:
-    Type: AWS::ApiGateway::UsagePlan
-    DependsOn:
-      - RERClientApiProdStage
-    Properties:
-      UsagePlanName: RERClientUsagePlan
-      ApiStages:
-        - ApiId: !Ref RERClientApi
-          Stage: Prod
-
   RERSessionAuthApiUsagePlan:
     Type: AWS::ApiGateway::UsagePlan
     DependsOn:
@@ -187,18 +178,6 @@ Resources:
         - ApiId: !Ref RERScraperApi
           Stage: Prod
 
-  RERClientApiKeyOne:
-    Type: AWS::ApiGateway::ApiKey
-    Properties:
-      Enabled: true
-      Name: RERClientApiKeyOne
-
-  RERClientApiKeyTwo:
-    Type: AWS::ApiGateway::ApiKey
-    Properties:
-      Enabled: true
-      Name: RERClientApiKeyTwo
-
   RERSessionAuthApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
@@ -210,20 +189,6 @@ Resources:
     Properties:
       Enabled: true
       Name: RERScraperApiKey
-
-  RERClientUsagePlanKeyOne:
-    Type: AWS::ApiGateway::UsagePlanKey
-    Properties:
-      KeyId: !Ref RERClientApiKeyOne
-      KeyType: API_KEY
-      UsagePlanId: !Ref RERClientApiUsagePlan
-
-  RERClientUsagePlanKeyTwo:
-    Type: AWS::ApiGateway::UsagePlanKey
-    Properties:
-      KeyId: !Ref RERClientApiKeyTwo
-      KeyType: API_KEY
-      UsagePlanId: !Ref RERClientApiUsagePlan
 
   RERSessionAuthUsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
@@ -240,27 +205,18 @@ Resources:
       UsagePlanId: !Ref RERScraperApiUsagePlan
 
 Outputs:
-  RERClientApiUrl:
-    Description: "API Gateway endpoint URL for the RER client"
-    Value: !Sub "https://${RERClientApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/"
   RERSessionAuthApiUrl:
     Description: "API Gateway endpoint URL for the RER session auth proxy"
     Value: !Sub "https://${RERSessionAuthApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/"
   RERScraperApiUrl:
     Description: "API Gateway endpoint URL for the RER scraper"
     Value: !Sub "https://${RERScraperApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/"
-  RERClientFunction:
-    Description: "RER client Lambda Function ARN"
-    Value: !GetAtt RERClientFunction.Arn
   RERSessionAuthFunction:
     Description: "RER session auth Lambda Function ARN"
     Value: !GetAtt RERSessionAuthFunction.Arn
   RERScraperFunction:
     Description: "RER scraper Lambda Function ARN"
     Value: !GetAtt RERScraperFunction.Arn
-  RERClientFunctionIamRole:
-    Description: "Implicit IAM Role created for RER client"
-    Value: !GetAtt RERClientFunctionRole.Arn
   RERSessionAuthFunctionIamRole:
     Description: "Implicit IAM Role created for RER session auth proxy"
     Value: !GetAtt RERSessionAuthFunctionRole.Arn

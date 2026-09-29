@@ -89,6 +89,13 @@ class SmartSuiteCookieStore:
             self._record_url(), json=payload, timeout=self.timeout
         )
         response.raise_for_status()
+        import logging
+
+        logging.getLogger(__name__).info(
+            "Saved cookies to SmartSuite record %s (HTTP %s)",
+            self.record_id,
+            response.status_code,
+        )
 
     def _record_url(self) -> str:
         self._validate_configuration()
