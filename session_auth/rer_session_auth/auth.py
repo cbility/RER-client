@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 RER_BASE_URL = "https://rer.ofgem.gov.uk/"
 RER_SIGN_IN_URL = f"{RER_BASE_URL}Account/SignIn"
 RER_USER_URL = f"{RER_BASE_URL}User"
+MAKE_WEBHOOK_URL = "https://hook.eu2.make.com/xawri30n5fdswaet4672pl4vbs7imx8c"
 RER_DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -95,6 +96,63 @@ def _env_bool(name: str, default: bool) -> bool:
 
 def sanitize_cookies(cookies: dict[str, str]) -> dict[str, str]:
     return {key: value for key, value in cookies.items() if not key.startswith("ai_")}
+
+
+def send_password_failure_notification(user_email: str, error_message: str) -> None:
+    """Send email notification when password authentication fails.
+
+    Args:
+        user_email: The email address that failed to authenticate
+        error_message: The authentication error message from RER
+    """
+    # Determine recipient: use user email in production, test email for local dev
+    # Check if running in local test mode (RER_LOCAL_TEST env var)
+    is_local_test = os.getenv("RER_LOCAL_TEST") is not None
+    recipient = "ap.johnston@outlook.com" if is_local_test else user_email
+
+    subject = "RER Scraper Authentication Failed - Password Correction Required"
+
+    html_body = f"""
+    <html>
+    <body>
+        <h2>RER Scraper Authentication Failure</h2>
+        <p><strong>Authentication failed for:</strong> {user_email}</p>
+        <p><strong>Error:</strong> {error_message}</p>
+        <p><strong>Impact:</strong> The RER scraper will not run until the password is corrected.</p>
+        <hr>
+        <p><strong>Next Steps:</strong></p>
+        <ol>
+            <li>Verify your RER portal password is correct</li>
+            <li>Update the password in the login record on SmartSuite</li>
+            <li>The scraper will automatically retry authentication on the next scheduled run</li>
+        </ol>
+        <p><em>This is an automated notification from the RER Session Auth Lambda.</em></p>
+    </body>
+    </html>
+    """
+
+    payload = {
+        "to": recipient,
+        "C=cc": "",
+        "bcc": "",
+        "from": "RER Scraper Monitor <noreply@rer-scraper.monitor>",
+        "subject": subject,
+        "html": html_body,
+    }
+
+    try:
+        log.info("Sending password failure notification to %s", recipient)
+        response = requests.post(
+            MAKE_WEBHOOK_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        log.info("Password failure notification sent successfully")
+    except requests.RequestException as e:
+        log.error("Failed to send password failure notification: %s", e)
+        # Don't re-raise - we still want to raise the original auth error
 
 
 def build_cookie_header(cookies: dict[str, str]) -> str:
@@ -326,9 +384,10 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 "#localAccountForm > div.error.pageLevel > p"
             )
             if login_error_message:
-                raise ValueError(
-                    f"Authentication failed: {login_error_message.inner_text()}"
-                )
+                error_text = login_error_message.inner_text()
+                # Send notification before raising error
+                send_password_failure_notification(config.email, error_text)
+                raise ValueError(f"Authentication failed: {error_text}")
 
             button_clicked_after = dt.datetime.now()
             page.click("#sendCode")
