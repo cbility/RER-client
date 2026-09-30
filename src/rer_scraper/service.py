@@ -210,17 +210,28 @@ class RERScraperService:
             f"Fetched {len(organisation_summaries)} organisations for logged in user. Getting extra info for each organisation..."
         )
         organisations: list[REROrganisation] = []
-        for org_summary in organisation_summaries:
+        for idx, org_summary in enumerate(organisation_summaries, 1):
+            logger.debug(
+                f"[{idx}/{len(organisation_summaries)}] Fetching details for {org_summary.name} ({org_summary.organisation_id})"
+            )
             org_detail = rer.get_organisation_detail(org_summary.organisation_id)
             organisations.append(REROrganisation(org_summary, org_detail))
 
-        # logger.debug(f"Organisations: {organisations}")
         organisation_stations_lists: list[RERStation] = []
-        for org in organisations:
+        for idx, org in enumerate(organisations, 1):
+            logger.debug(
+                f"[{idx}/{len(organisations)}] Fetching stations for {org.org_summary.name} ({org.org_summary.organisation_id})"
+            )
             org_stations_group = rer.get_organisation_stations(
                 org.org_summary.organisation_id
             )
+            logger.debug(
+                f"  Found {len(list(org_stations_group.stations))} stations for {org.org_summary.name}"
+            )
             for station in org_stations_group.stations:
+                logger.debug(
+                    f"    Fetching detail for station: {station.station_name} ({station.station_id})"
+                )
                 station_detail = rer.get_station(station.station_id)
                 organisation_stations_lists.append(
                     RERStation(
@@ -230,13 +241,10 @@ class RERScraperService:
                     )
                 )
 
-        # logger.debug(f"Stations: {organisation_stations}")
         organisation_certificates = [
             rer.get_organisation_certificates(org.org_summary.organisation_id)
             for org in organisations
         ]
-
-        # logger.debug(f"Certificates: {organisation_certificates}")
 
         output_periods = [
             rer.get_organisation_output_data(org.org_summary.organisation_id)
