@@ -15,9 +15,12 @@ Output structure:
 """
 
 import os
+import re
 import logging
 from datetime import datetime
 from pathlib import Path
+
+from selectolax.parser import HTMLParser
 
 from _auth import get_client
 
@@ -47,6 +50,23 @@ def save_snapshot(org_id: str, endpoint: str, html: str):
         f.write(html)
 
     log.info(f"  ✓ {endpoint}")
+
+
+def get_total_pages(html: str) -> int:
+    """Extract total pages from pagination results summary."""
+    tree = HTMLParser(html)
+    results_el = tree.css_first(".moj-pagination__results")
+    if not results_el:
+        return 1
+    
+    text = results_el.text(separator=" ", strip=True)
+    m = re.search(r"Showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)", text)
+    if not m:
+        return 1
+    
+    start, end, total = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    page_size = end - start + 1
+    return (total + page_size - 1) // page_size
 
 
 def main():
@@ -86,7 +106,7 @@ def main():
 
     # Get all organisations
     log.info("Fetching organisation list...")
-    organisations = client.get_user_org_summary()
+    organisations = client.get_user_organisations()
     log.info(f"Found {len(organisations)} organisation(s)")
     log.info("")
 
@@ -155,6 +175,10 @@ def main():
                         f"/tasks/output-data/page-{page_number}",
                         response.text,
                     )
+                    # Check if there are more pages
+                    total_pages = get_total_pages(response.text)
+                    if page_number >= total_pages:
+                        break
                     page_number += 1
             except Exception as e:
                 log.error(f"  ✗ Output data tasks: {e}")
@@ -177,6 +201,10 @@ def main():
                         f"/output/page-{page_number}",
                         response.text,
                     )
+                    # Check if there are more pages
+                    total_pages = get_total_pages(response.text)
+                    if page_number >= total_pages:
+                        break
                     page_number += 1
             except Exception as e:
                 log.error(f"  ✗ Output submissions: {e}")
