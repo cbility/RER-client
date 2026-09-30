@@ -173,7 +173,7 @@ class TestLiveScraper:
             function_name="test-scraper-live",
             client_factory=client_factory,
             dry_run=dry_run_mode,
-            ss_login_record_id="",
+            ss_login_record_id="6a7f301f54fd4d6f819c1e5f",
         )
 
         logger.info(f"RERScraperService created (dry_run={service.dry_run})")

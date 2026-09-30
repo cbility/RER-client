@@ -158,7 +158,7 @@ class TestScraperAllCachedData:
             function_name="test-scraper",
             client_factory=lambda cookies: cached_rer_client,
             dry_run=dry_run_mode,
-            ss_login_record_id="",
+            ss_login_record_id="6a7f301f54fd4d6f819c1e5f",
         )
 
         logger.info(f"RERScraperService created (dry_run={service.dry_run})")
