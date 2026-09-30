@@ -109,7 +109,7 @@ class RERClient:
         response = self._request("User")
         return rer_parsing._parse_user(response.text)
 
-    def get_user_org_summary(
+    def get_user_organisations(
         self,
         sort_field: str | None = None,
         sort_direction: str | None = None,
@@ -131,7 +131,7 @@ class RERClient:
         if results_el:
             m = re.search(
                 r"Showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)",
-                results_el.text(strip=True),
+                results_el.text(separator=" ", strip=True),
             )
             if m:
                 start, end, total = int(m.group(1)), int(m.group(2)), int(m.group(3))

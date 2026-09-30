@@ -88,12 +88,14 @@ def _parse_user_organisations(pages: list[str]) -> list[OrganisationSummary]:
             if not cells:
                 continue
             org_link = cells[0].css_first("a")
-            org_id = ""
-            if org_link:
-                href = org_link.attrs.get("href", "")
-                if not href:
-                    raise ValueError("Organisation link does not have href")
-                org_id = href.split("/Organisations/")[-1].split("/")[0]
+            if not org_link:
+                continue
+            href = org_link.attrs.get("href", "")
+            if not href or "/Organisations/" not in href:
+                continue
+            org_id = href.split("/Organisations/")[-1].split("/")[0].split("#")[0]
+            if not org_id or not org_id.startswith("GEN"):
+                continue
             organisations.append(
                 OrganisationSummary(
                     organisation_id=org_id,

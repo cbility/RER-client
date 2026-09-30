@@ -84,12 +84,24 @@ class CachedRERClient(RERClient):
             # Check if this is an Output endpoint
             if endpoint.endswith("/Output"):
                 endpoint = f"{endpoint}_page-{page_num}"
+            elif endpoint == "User" and page_num > 1:
+                # User endpoint pagination: page 2+ -> "User_page2"
+                endpoint = f"{endpoint}_page{page_num}"
             elif page_num > 1:
                 endpoint = f"{endpoint}_page{page_num}"
 
         # Map endpoint to cache directory structure
-        # User endpoint is special: "User" -> "_user/_user"
-        if endpoint == "User":
+        # User endpoint is special: "User" -> "_user/_user" (with optional page number)
+        if endpoint == "User" or endpoint.startswith("User_"):
+            if endpoint.startswith("User_"):
+                # Paginated request: "User_page2" -> "_user_page-2/_user"
+                page_num = endpoint.replace("User_page", "")
+                return (
+                    self.cache_dir
+                    / f"_user_page-{page_num}"
+                    / "_user"
+                    / "response.html"
+                )
             return self.cache_dir / "_user" / "_user" / "response.html"
 
         # Organisation endpoints: "Organisations/OrganisationReview/GEN123" -> "GEN123/_organisation"
@@ -202,6 +214,14 @@ class CachedRERClient(RERClient):
         response.encoding = "utf-8"
         response.url = f"https://rer.ofgem.gov.uk/{cache_path.parent.name}"
         return response
+
+    def get_user_organisations(
+        self,
+        sort_field: str | None = None,
+        sort_direction: str | None = None,
+    ) -> list:
+        """GET /User - Returns all organisations for the authenticated user across all pages."""
+        return super().get_user_organisations(sort_field, sort_direction)
 
 
 def create_cached_client(

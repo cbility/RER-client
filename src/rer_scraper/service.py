@@ -205,7 +205,7 @@ class RERScraperService:
         user = rer.get_user()
         logger.info(f"Fetched user: {user}")
 
-        organisation_summaries = rer.get_user_org_summary()
+        organisation_summaries = rer.get_user_organisations()
         logger.info(
             f"Fetched {len(organisation_summaries)} organisations for logged in user. Getting extra info for each organisation..."
         )
@@ -500,7 +500,7 @@ class RERScraperService:
 
     @staticmethod
     def _find_source_organisation_id(rer: RERClient, station_id: str) -> str:
-        for organisation in rer.get_user_org_summary():
+        for organisation in rer.get_user_organisations():
             station_list = rer.get_organisation_stations(organisation.organisation_id)
             if any(
                 station.station_id == station_id for station in station_list.stations
