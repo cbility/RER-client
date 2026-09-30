@@ -58,12 +58,12 @@ def get_total_pages(html: str) -> int:
     results_el = tree.css_first(".moj-pagination__results")
     if not results_el:
         return 1
-    
+
     text = results_el.text(separator=" ", strip=True)
     m = re.search(r"Showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)", text)
     if not m:
         return 1
-    
+
     start, end, total = int(m.group(1)), int(m.group(2)), int(m.group(3))
     page_size = end - start + 1
     return (total + page_size - 1) // page_size
@@ -110,10 +110,18 @@ def main():
     log.info(f"Found {len(organisations)} organisation(s)")
     log.info("")
 
-    # Save user dashboard
-    log.info("Saving user dashboard...")
-    user_response = client._request("User")
-    save_snapshot("_user", "/user", user_response.text)
+    # Save user dashboard (all pages)
+    log.info("Saving user dashboard (all pages)...")
+    page_number = 1
+    while True:
+        user_response = client._request("User", params={"pageNumber": page_number})
+        save_snapshot("_user", f"/user/page-{page_number}", user_response.text)
+        # Check if there are more pages
+        total_pages = get_total_pages(user_response.text)
+        if page_number >= total_pages:
+            break
+        page_number += 1
+    log.info(f"  ✓ Saved {page_number} page(s) of user dashboard")
     log.info("")
 
     # Process each organisation
