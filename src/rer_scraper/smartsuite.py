@@ -33,12 +33,16 @@ logger = logging.getLogger(__name__)
 # region helpers
 
 
-def convert_postcode_to_coordinates(postcode: str) -> tuple[float, float]:
+def convert_postcode_to_coordinates(postcode: str) -> tuple[float | None, float | None]:
     formatted_postcode = postcode.replace(" ", "")
     data = requests.get(
         f"https://api.postcodes.io/postcodes/{formatted_postcode}"
     ).json()
-    return data["result"]["latitude"], data["result"]["longitude"]
+    try:
+        return data["result"]["latitude"], data["result"]["longitude"]
+    except (KeyError, TypeError) as e:
+        logger.error(f"Failed to convert postcode '{postcode}' to coordinates: {e}")
+        return None, None
 
 
 # endregion helpers
