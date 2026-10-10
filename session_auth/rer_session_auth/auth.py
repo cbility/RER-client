@@ -81,10 +81,8 @@ class GmailMessagePayload(TypedDict, total=False):
 
 
 class GmailMessage(TypedDict):
-    id: str
-    threadId: str
-    payload: NotRequired[GmailMessagePayload]
-    internalDate: NotRequired[str]
+    date: str  # ISO string
+    html: str  # message content
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -116,16 +114,10 @@ def send_password_failure_notification(user_email: str, error_message: str) -> N
     <html>
     <body>
         <h2>RER Scraper Authentication Failure</h2>
-        <p><strong>Authentication failed for:</strong> {user_email}</p>
-        <p><strong>Error:</strong> {error_message}</p>
-        <p><strong>Impact:</strong> The RER scraper will not run until the password is corrected.</p>
+        <p><strong>Automatic login failed for:</strong> {user_email}</p>
+        <p>The RER returned the following message: <strong>{error_message}</strong></p>
+        <p>This probably means that the password saved on SmartSuite for the RER account is incorrect.<br>You should correct the password ASAP, as the scraper will continue to fail until it is updated.</p>
         <hr>
-        <p><strong>Next Steps:</strong></p>
-        <ol>
-            <li>Verify your RER portal password is correct</li>
-            <li>Update the password in the login record on SmartSuite</li>
-            <li>The scraper will automatically retry authentication on the next scheduled run</li>
-        </ol>
         <p><em>This is an automated notification from the RER Session Auth Lambda.</em></p>
     </body>
     </html>
@@ -133,7 +125,7 @@ def send_password_failure_notification(user_email: str, error_message: str) -> N
 
     payload = {
         "to": recipient,
-        "C=cc": "",
+        "cc": "",
         "bcc": "",
         "from": "RER Scraper Monitor <noreply@rer-scraper.monitor>",
         "subject": subject,
@@ -250,63 +242,39 @@ def _load_gmail_credentials(token_json: str | None, token_file: str | None):
     return credentials
 
 
-def get_gmail_messages(
-    since_date: dt.date,
-    max_messages: int,
-    token_json: str | None,
-    token_file: str | None,
-) -> list[GmailMessage]:
-    from googleapiclient.discovery import build  # type: ignore[import-untyped]
-    from googleapiclient.errors import HttpError  # type: ignore[import-untyped]
-
+def get_gmail_messages() -> list[GmailMessage]:
+    """Retrieve Gmail messages received by energy.source.notifications@gmail.com in the last day that include the text 'New message from msverify' in the subject"""
+    api_key = os.getenv("MAKE_API_KEY")
+    if not api_key:
+        raise MissingConfigurationError(
+            "Set MAKE_API_KEY environment variable to retrieve Gmail messages."
+        )
     try:
-        credentials = _load_gmail_credentials(
-            token_json=token_json, token_file=token_file
-        )
-        service = build("gmail", "v1", credentials=credentials, num_retries=3)
-        query = f'after:{since_date.strftime("%Y/%m/%d")}'
-        results = (
-            service.users()
-            .messages()
-            .list(userId="me", q=query, maxResults=max_messages)
-            .execute()
-        )
-    except HttpError as e:
-        log.error(f"Gmail API error: {e}")
+        url = "https://hook.eu1.make.com/7thmbhze9hiicw1uwxkvgw4z9j8xzx3c"
+        response = requests.post(url, headers={"x-make-apikey": api_key})
+        if response.status_code != 200:
+            raise requests.HTTPError(
+                f"Failed to retrieve Gmail messages: {response.status_code}. Error: {response.text}"
+            )
+        result = response.json()
+        emails: list[GmailMessage] = json.loads(result["json"])
+        print(f"Retrieved emails: {emails}")
+    except requests.HTTPError as e:
+        log.error(f"Error fetching emails: {e}")
         raise
     except Exception as e:
-        log.error(f"Unexpected error loading Gmail messages: {e}")
+        log.error(f"Unexpected error fetching emails: {e}")
         raise
-    message_refs = results.get("messages", [])
+    if emails[0]["date"] is None:
+        return (
+            []
+        )  # Make.com insists on parsing together at least one object even for no results
 
-    messages: list[GmailMessage] = []
-    for message_ref in message_refs:
-        message = (
-            service.users()
-            .messages()
-            .get(userId="me", id=message_ref["id"], format="full")
-            .execute()
-        )
-        messages.append(message)
-    return messages
-
-
-def decode_message_body(payload: GmailMessagePayload | GmailMessagePart | None) -> str:
-    if not payload:
-        return ""
-
-    body = payload.get("body", {})
-    data = body.get("data")
-    if data:
-        return base64.urlsafe_b64decode(data).decode("utf-8")
-
-    return "\n".join(decode_message_body(part) for part in payload.get("parts", []))
+    return emails
 
 
 def retrieve_mfa_code(
     button_clicked_after: dt.datetime,
-    token_json: str | None,
-    token_file: str | None,
     max_retries: int,
     wait_between_retries: int,
 ) -> str:
@@ -314,21 +282,16 @@ def retrieve_mfa_code(
         log.info(
             "Attempting to retrieve MFA code (%s/%s)", retry_number + 1, max_retries
         )
-        messages_today = get_gmail_messages(
-            since_date=button_clicked_after.date(),
-            max_messages=50,
-            token_json=token_json,
-            token_file=token_file,
-        )
+        messages_today = get_gmail_messages()
         messages_after_click = [
             message
             for message in messages_today
-            if dt.datetime.fromtimestamp(int(message.get("internalDate", 0)) / 1000)
-            > button_clicked_after
+            if dt.datetime.fromisoformat(message["date"]) > button_clicked_after
         ]
 
         for message in messages_after_click:
-            body_text = decode_message_body(message.get("payload"))
+            body_text = message["html"]
+            print(body_text)
             if "RER-External-prd authentication" not in body_text:
                 continue
 
@@ -396,8 +359,6 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             sleep(5)
             mfa_code = retrieve_mfa_code(
                 button_clicked_after=button_clicked_after,
-                token_json=config.gmail_token_json,
-                token_file=config.gmail_token_file,
                 max_retries=config.max_retries,
                 wait_between_retries=config.wait_between_retries,
             )
