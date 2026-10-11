@@ -6,7 +6,7 @@ Gets the first organisation ID from the user dashboard automatically.
 import os
 
 from _auth import get_client
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 OUTPUT = os.path.join(os.path.dirname(__file__), "organisation_output_data.html")
 

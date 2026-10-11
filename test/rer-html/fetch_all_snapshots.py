@@ -22,7 +22,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from _auth import get_client
 

@@ -5,7 +5,7 @@ import logging  # for logging
 
 import requests  # lighttweight web requests
 
-from selectolax.parser import HTMLParser  # for parsing HTML
+from selectolax.lexbor import LexborHTMLParser as HTMLParser  # for parsing HTML
 
 import json  # for saving cookies
 import re  # for pagination parsing

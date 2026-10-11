@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 import re
-from selectolax.parser import HTMLParser  # for parsing HTML
+from selectolax.lexbor import LexborHTMLParser as HTMLParser  # for parsing HTML
 from rer_client.models import (
     CertificateBreakdown,
     CertificateBreakdownItem,
