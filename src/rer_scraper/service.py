@@ -217,7 +217,7 @@ class RERScraperService:
             org_detail = rer.get_organisation_detail(org_summary.organisation_id)
             organisations.append(REROrganisation(org_summary, org_detail))
 
-        organisation_stations_lists: list[RERStation] = []
+        stations: list[RERStation] = []
         for idx, org in enumerate(organisations, 1):
             logger.debug(
                 f"[{idx}/{len(organisations)}] Fetching stations for {org.org_summary.name} ({org.org_summary.organisation_id})"
@@ -233,7 +233,7 @@ class RERScraperService:
                     f"    Fetching detail for station: {station.station_name} ({station.station_id})"
                 )
                 station_detail = rer.get_station(station.station_id)
-                organisation_stations_lists.append(
+                stations.append(
                     RERStation(
                         organisation_id=org.org_summary.organisation_id,
                         station_summary=station,
@@ -251,14 +251,12 @@ class RERScraperService:
             for org in organisations
         ]
 
-        logger.info(
-            f"Fetched data for {len(organisation_stations_lists)} organisations"
-        )
+        logger.info(f"Fetched data for {len(stations)} stations")
 
         return (
             user,
             organisations,
-            organisation_stations_lists,
+            stations,
             organisation_certificates,
             output_periods,
         )
