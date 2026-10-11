@@ -42,8 +42,8 @@ class RERAuthConfig:
     gmail_token_json: str | None
     gmail_token_file: str | None
     headless: bool = True
-    max_retries: int = 5
-    wait_between_retries: int = 10
+    max_retries: int = 3
+    wait_between_retries: int = 15
 
     @classmethod
     def from_env(cls, email, password) -> "RERAuthConfig":
@@ -53,8 +53,8 @@ class RERAuthConfig:
             gmail_token_json=os.getenv("GMAIL_TOKEN_JSON"),
             gmail_token_file=os.getenv("GMAIL_TOKEN_FILE"),
             headless=_env_bool("PLAYWRIGHT_HEADLESS", True),
-            max_retries=int(os.getenv("RER_MFA_MAX_RETRIES", "5")),
-            wait_between_retries=int(os.getenv("RER_MFA_WAIT_SECONDS", "10")),
+            max_retries=int(os.getenv("RER_MFA_MAX_RETRIES", "3")),
+            wait_between_retries=int(os.getenv("RER_MFA_WAIT_SECONDS", "15")),
         )
 
 
@@ -356,7 +356,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             page.click("#sendCode")
             page.wait_for_load_state("networkidle")
 
-            sleep(5)
+            sleep(10)
             mfa_code = retrieve_mfa_code(
                 button_clicked_after=button_clicked_after,
                 max_retries=config.max_retries,
