@@ -77,6 +77,11 @@ class CachedRERClient(RERClient):
         Returns:
             Path to the cached HTML file
         """
+        # User snapshots store every page below the _user directory.
+        if endpoint == "User":
+            page_num = (params or {}).get("pageNumber", 1)
+            return self.cache_dir / "_user" / f"_user_page-{page_num}" / "response.html"
+
         # Handle pagination - include page number in path
         # Note: Output endpoint uses format _output_page-N (with dash) for all pages including page 1
         if params and "pageNumber" in params:
@@ -91,19 +96,6 @@ class CachedRERClient(RERClient):
                 endpoint = f"{endpoint}_page{page_num}"
 
         # Map endpoint to cache directory structure
-        # User endpoint is special: "User" -> "_user/_user" (with optional page number)
-        if endpoint == "User" or endpoint.startswith("User_"):
-            if endpoint.startswith("User_"):
-                # Paginated request: "User_page2" -> "_user_page-2/_user"
-                page_num = endpoint.replace("User_page", "")
-                return (
-                    self.cache_dir
-                    / f"_user_page-{page_num}"
-                    / "_user"
-                    / "response.html"
-                )
-            return self.cache_dir / "_user" / "_user" / "response.html"
-
         # Organisation endpoints: "Organisations/OrganisationReview/GEN123" -> "GEN123/_organisation"
         if endpoint.startswith("Organisations/"):
             parts = endpoint.split("/")
