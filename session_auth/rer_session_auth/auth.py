@@ -18,7 +18,8 @@ log = logging.getLogger(__name__)
 RER_BASE_URL = "https://rer.ofgem.gov.uk/"
 RER_SIGN_IN_URL = f"{RER_BASE_URL}Account/SignIn"
 RER_USER_URL = f"{RER_BASE_URL}User"
-MAKE_WEBHOOK_URL = "https://hook.eu2.make.com/xawri30n5fdswaet4672pl4vbs7imx8c"
+MAKE_EMAILER_URL = "https://hook.eu2.make.com/xawri30n5fdswaet4672pl4vbs7imx8c"
+MAKE_GET_MFA_EMAILS_URL = "https://hook.eu1.make.com/7thmbhze9hiicw1uwxkvgw4z9j8xzx3c"
 RER_DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -135,7 +136,7 @@ def send_password_failure_notification(user_email: str, error_message: str) -> N
     try:
         log.info("Sending password failure notification to %s", recipient)
         response = requests.post(
-            MAKE_WEBHOOK_URL,
+            MAKE_EMAILER_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=30,
@@ -144,6 +145,59 @@ def send_password_failure_notification(user_email: str, error_message: str) -> N
         log.info("Password failure notification sent successfully")
     except requests.RequestException as e:
         log.error("Failed to send password failure notification: %s", e)
+        # Don't re-raise - we still want to raise the original auth error
+
+
+def send_mfa_retrieval_failure_notification(
+    user_email: str, error_message: str
+) -> None:
+    """Send email notification when MFA retrieval fails.
+
+    Args:
+        user_email: The email address that failed to authenticate
+        error_message: The authentication error message from RER
+    """
+    # Determine recipient: use user email in production, test email for local dev
+    # Check if running in local test mode (RER_LOCAL_TEST env var)
+    is_local_test = os.getenv("RER_LOCAL_TEST") is not None
+    recipient = "ap.johnston@outlook.com" if is_local_test else user_email
+
+    subject = "RER Scraper Authentication Failed - MFA Retrieval Failed"
+
+    html_body = f"""
+    <html>
+    <body>
+        <h2>RER Scraper Authentication Failure</h2>
+        <p><strong>Automatic login failed for:</strong> {user_email}</p>
+        <p>Error message: <strong>{error_message}</strong></p>
+        <p>This probably means that there is a problem with the SMS message forwarding that means the MFA code is not reaching energy.source.notifications@gmail.com.<br>You should fix the issue ASAP, as the scraper will continue to fail until the MFA code can be retrieved.</p>
+        <hr>
+        <p><em>This is an automated notification from the RER Session Auth Lambda.</em></p>
+    </body>
+    </html>
+    """
+
+    payload = {
+        "to": recipient,
+        "cc": "",
+        "bcc": "",
+        "from": "RER Scraper Monitor <noreply@rer-scraper.monitor>",
+        "subject": subject,
+        "html": html_body,
+    }
+
+    try:
+        log.info("Sending MFA retrieval failure notification to %s", recipient)
+        response = requests.post(
+            MAKE_EMAILER_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        log.info("MFA retrieval failure notification sent successfully")
+    except requests.RequestException as e:
+        log.error("Failed to send MFA retrieval failure notification: %s", e)
         # Don't re-raise - we still want to raise the original auth error
 
 
@@ -187,61 +241,6 @@ def are_cookies_valid(cookies: dict[str, str], timeout: int = 30) -> bool:
     return not any(marker in response.text for marker in sign_in_markers)
 
 
-def get_no_token_error_message(token_file_path: Path) -> str:
-    return f"""
-{'=' * 80}
-ERROR: {token_file_path} not found
-{'=' * 80}
-Gmail API requires OAuth2 authentication. Follow these steps:
-1. Create OAuth2 desktop app credentials in Google Cloud Console.
-2. Enable the Gmail API.
-3. Add your Gmail address as a test user if the OAuth app is in testing.
-4. Run an OAuth flow that writes {token_file_path}.
-
-Example:
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    flow = InstalledAppFlow.from_client_secrets_file(
-        "gmail_credentials.json",
-        ["https://mail.google.com/"],
-    )
-    creds = flow.run_local_server(port=0)
-    with open(r"{token_file_path}", "w") as f:
-        f.write(creds.to_json())
-{'=' * 80}
-"""
-
-
-def _load_gmail_credentials(token_json: str | None, token_file: str | None):
-    from google.auth.transport.requests import Request  # type: ignore[import-untyped]
-    from google.oauth2.credentials import Credentials  # type: ignore[import-untyped]
-
-    if token_json:
-        info = json.loads(token_json)
-        credentials = Credentials.from_authorized_user_info(
-            info, ["https://mail.google.com/"]
-        )
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-        return credentials
-
-    if not token_file:
-        raise MissingConfigurationError(
-            "Set GMAIL_TOKEN_JSON or GMAIL_TOKEN_FILE so the auth Lambda can retrieve MFA emails."
-        )
-
-    token_path = Path(token_file)
-    if not token_path.exists():
-        raise FileNotFoundError(get_no_token_error_message(token_path))
-
-    credentials = Credentials.from_authorized_user_file(
-        token_path, ["https://mail.google.com/"]
-    )
-    if credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
-        token_path.write_text(credentials.to_json(), encoding="utf-8")
-    return credentials
-
-
 def get_gmail_messages() -> list[GmailMessage]:
     """Retrieve Gmail messages received by energy.source.notifications@gmail.com in the last day that include the text 'New message from msverify' in the subject"""
     api_key = os.getenv("MAKE_API_KEY")
@@ -250,7 +249,7 @@ def get_gmail_messages() -> list[GmailMessage]:
             "Set MAKE_API_KEY environment variable to retrieve Gmail messages."
         )
     try:
-        url = "https://hook.eu1.make.com/7thmbhze9hiicw1uwxkvgw4z9j8xzx3c"
+        url = MAKE_GET_MFA_EMAILS_URL
         response = requests.post(url, headers={"x-make-apikey": api_key})
         if response.status_code != 200:
             raise requests.HTTPError(
@@ -357,11 +356,18 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             page.wait_for_load_state("networkidle")
 
             sleep(10)
-            mfa_code = retrieve_mfa_code(
-                button_clicked_after=button_clicked_after,
-                max_retries=config.max_retries,
-                wait_between_retries=config.wait_between_retries,
-            )
+            try:
+                mfa_code = retrieve_mfa_code(
+                    button_clicked_after=button_clicked_after,
+                    max_retries=config.max_retries,
+                    wait_between_retries=config.wait_between_retries,
+                )
+            except TimeoutError as e:
+                send_mfa_retrieval_failure_notification(
+                    config.email,
+                    str(e),
+                )
+                raise e
 
             page.fill("#verificationCode", mfa_code)
             page.click("#verifyCode")
