@@ -17,6 +17,8 @@ Output structure:
 import os
 import re
 import logging
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -50,6 +52,31 @@ def save_snapshot(org_id: str, endpoint: str, html: str):
         f.write(html)
 
     log.info(f"  ✓ {endpoint}")
+
+
+def replace_latest_snapshot():
+    """Replace the latest snapshot with a copy of this completed run."""
+    latest_dir = OUTPUT_BASE / "latest"
+    staging_dir = Path(tempfile.mkdtemp(prefix=".latest-staging-", dir=OUTPUT_BASE))
+    backup_dir = staging_dir.with_name(
+        staging_dir.name.replace(".latest-staging-", ".latest-backup-", 1)
+    )
+
+    try:
+        shutil.copytree(RUN_DIR, staging_dir, dirs_exist_ok=True)
+        if latest_dir.exists():
+            latest_dir.rename(backup_dir)
+        try:
+            staging_dir.rename(latest_dir)
+        except Exception:
+            if backup_dir.exists():
+                backup_dir.rename(latest_dir)
+            raise
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+    finally:
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
 
 
 def get_total_pages(html: str) -> int:
@@ -321,6 +348,8 @@ def main():
             log.error(f"✗ Error processing organisation {org_id}: {e}")
             log.info("")
 
+    replace_latest_snapshot()
+    log.info(f"Updated latest snapshot: {OUTPUT_BASE / 'latest'}")
     log.info("=" * 80)
     log.info(f"Snapshot complete! Files saved to: {RUN_DIR}")
     log.info("=" * 80)
