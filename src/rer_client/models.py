@@ -112,7 +112,7 @@ class OrganisationDetail(RERModel):
         organisation_id: Unique identifier (e.g., "GEN0213742")
         name: Organisation/company name
         type: Organisation type (e.g., "Generator Commercial", "Generator Domestic")
-        status: Account approval status (e.g., "APPROVED", "Pending", "Revoked")
+        status: Account approval status (e.g., "Approved", "Pending", "Revoked")
         address: Registered address as a list of lines (line 1, [line 2,] city, [region,] postcode, country)
         contact: Primary contact person's name and email
 
@@ -120,7 +120,7 @@ class OrganisationDetail(RERModel):
         organisation_id: "GEN0213742"
         name: "GLENSKINNO BIOFUELS LTD"
         type: "Generator Commercial"
-        status: "APPROVED"
+        status: "Approved"
         address: [
             "2 Stewart Street",
             "Milngavie",
@@ -137,7 +137,7 @@ class OrganisationDetail(RERModel):
     organisation_id: str  # Unique identifier, e.g., "GEN0213742"
     name: str  # Organisation/company name
     type: str  # Organisation type, e.g., "Generator Commercial"
-    status: str  # Account status, e.g., "APPROVED"
+    status: str  # Account status, e.g., "Approved", "Pending", "Revoked"
     address: list[str]  # Address lines (street, city, postcode, country)
     contact: OrganisationContact  # Primary contact information
 
@@ -407,12 +407,13 @@ class OrganisationCertificateGroup(RERModel):
 
     Example:
         organisation_id: "GEN0213742"
-        balance_period: "Balance of issued certificates from 2025 to 2027"
+        balance_period: "The current active certificate period. Certificates outside the current period are expired.
+            e.g. \"Balance of issued certificates from 2025 to 2027\""
         summaries: [CertificateTypeSummary(...), ...]
     """
 
     organisation_id: str  # Parent organisation ID
-    balance_period: str  # Description of the balance period
+    balance_period: str  # Description of the current active certificate period
     summaries: list[CertificateTypeSummary]  # Summary for each certificate type
 
 

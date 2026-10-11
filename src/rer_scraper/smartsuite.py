@@ -155,8 +155,25 @@ class RERSmartSuiteClient(SmartSuiteClient):
         self,
         rer_organisation_summary: OrganisationSummary,
         rer_organisation_details: OrganisationDetail,
+        rer_organisation_certificates: OrganisationCertificateGroup,
         ss_user_record_id: str,
     ):
+        roc_balance = next(
+            (
+                summary.balance
+                for summary in rer_organisation_certificates.summaries
+                if summary.cert_type == "ROC"
+            ),
+            None,
+        )
+        rego_balance = next(
+            (
+                summary.balance
+                for summary in rer_organisation_certificates.summaries
+                if summary.cert_type == "REGO"
+            ),
+            None,
+        )
         ss_organisation = {
             "sde6082ea0": rer_organisation_summary.name,  # generator/company name
             "s44395f753": rer_organisation_summary.organisation_id,  # organisation id
@@ -173,6 +190,8 @@ class RERSmartSuiteClient(SmartSuiteClient):
             "s90b4a920a": rer_organisation_details.type,
             "s8aaed9a66": rer_organisation_summary.user_status,
             "saskuds9": [ss_user_record_id],
+            "seqhlzoz": roc_balance,
+            "s3fafc589e": rego_balance,
         }
         return ss_organisation
 

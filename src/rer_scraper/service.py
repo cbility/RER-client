@@ -51,6 +51,7 @@ class REROrganisation:
 
     org_summary: OrganisationSummary
     org_detail: OrganisationDetail
+    org_certificates: OrganisationCertificateGroup
 
 
 @dataclass
@@ -230,10 +231,18 @@ class RERScraperService:
         organisations: list[REROrganisation] = []
         for idx, org_summary in enumerate(organisation_summaries, 1):
             logger.debug(
-                f"[{idx}/{len(organisation_summaries)}] Fetching details for {org_summary.name} ({org_summary.organisation_id})"
+                f"[{idx}/{len(organisation_summaries)}] Fetching organisation details for {org_summary.name} ({org_summary.organisation_id})"
             )
             org_detail = rer.get_organisation_detail(org_summary.organisation_id)
-            organisations.append(REROrganisation(org_summary, org_detail))
+            logger.debug(
+                f"[{idx}/{len(organisation_summaries)}] Fetching certificate details for {org_summary.name} ({org_summary.organisation_id})"
+            )
+            org_certificates = rer.get_organisation_certificates(
+                org_summary.organisation_id
+            )
+            organisations.append(
+                REROrganisation(org_summary, org_detail, org_certificates)
+            )
 
         stations: list[RERStation] = []
         for idx, org in enumerate(organisations, 1):
@@ -321,6 +330,7 @@ class RERScraperService:
                         **self.smartsuite.map_organisation(
                             org.org_summary,
                             org.org_detail,
+                            org.org_certificates,
                             ss_user_record_id,
                         ),
                         "id": ss_org_record["id"],
@@ -329,7 +339,10 @@ class RERScraperService:
             else:
                 insert_orgs.append(
                     self.smartsuite.map_organisation(
-                        org.org_summary, org.org_detail, ss_user_record_id
+                        org.org_summary,
+                        org.org_detail,
+                        org.org_certificates,
+                        ss_user_record_id,
                     )
                 )
         logger.info(f"{len(update_orgs)} organisations to UPDATE")
