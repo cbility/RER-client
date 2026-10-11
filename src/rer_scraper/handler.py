@@ -67,13 +67,18 @@ def build_service(dry_run: bool = False) -> RERScraperService:
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
     del context
     service = build_service()
+    organisation_reference = (event.get("queryStringParameters") or {}).get(
+        "organisation_reference"
+    )
     if event.get("retry_scrape") is True:
-        status_code, _ = service.run(schedule_retry=False)
+        status_code, _ = service.run(
+            schedule_retry=False, organisation_reference=organisation_reference
+        )
         if status_code == 202:
             raise SessionRefreshPending("RER session refresh is still in progress.")
         return None
 
-    status_code, result = service.run()
+    status_code, result = service.run(organisation_reference=organisation_reference)
     if status_code == 204:
         return {"statusCode": 204}
     if status_code == 202:

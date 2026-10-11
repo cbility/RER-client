@@ -3,6 +3,10 @@
 `POST /` starts RER scraper work. The scraper first reads operations from
 SmartSuite, then exits with `204 No Content` when there is no work.
 
+To refresh one organisation and its stations, include its RER reference as a
+query parameter, for example: `POST /?organisation_reference=GEN0191576`.
+The targeted refresh does not update the RER user record.
+
 When the session-auth API returns `202 Accepted`, the scraper returns:
 
 ```json

@@ -162,7 +162,11 @@ class RERScraperService:
     # endregion initialisation
     # region orchestration
 
-    def run(self, schedule_retry: bool = True) -> tuple[int, ScraperResult | None]:
+    def run(
+        self,
+        schedule_retry: bool = True,
+        organisation_reference: str | None = None,
+    ) -> tuple[int, ScraperResult | None]:
         run_start = datetime.now(tz=pytz.timezone("Europe/London"))
         operations = self.smartsuite.get_operations(run_start)
         if len(operations) == 0:
@@ -171,16 +175,22 @@ class RERScraperService:
         cookies = self.session_auth.get_cookies()
         if cookies is None:
             if schedule_retry:
-                self.retry_invoker.invoke(self.function_name, {"retry_scrape": True})
+                retry_payload: dict[str, Any] = {"retry_scrape": True}
+                if organisation_reference:
+                    retry_payload["queryStringParameters"] = {
+                        "organisation_reference": organisation_reference
+                    }
+                self.retry_invoker.invoke(self.function_name, retry_payload)
             return 202, None
 
         rer = self.client_factory(cookies)
         result = ScraperResult()
         if "refresh_data" in operations:
             user, organisations, stations, certificates, output_periods = (
-                self.get_current_data(rer)
+                self.get_current_data(rer, organisation_reference)
             )
-            self.update_rer_user(user)
+            if organisation_reference is None:
+                self.update_rer_user(user)
             org_id_map = self.update_rer_organisations(
                 organisations, self.ss_login_record_id
             )
@@ -200,12 +210,20 @@ class RERScraperService:
 
         return 200, result
 
-    def get_current_data(self, rer: RERClient):
+    def get_current_data(
+        self, rer: RERClient, organisation_reference: str | None = None
+    ):
 
         user = rer.get_user()
         logger.info(f"Fetched user: {user}")
 
         organisation_summaries = rer.get_user_organisations()
+        if organisation_reference:
+            organisation_summaries = [
+                organisation
+                for organisation in organisation_summaries
+                if organisation.organisation_id == organisation_reference
+            ]
         logger.info(
             f"Fetched {len(organisation_summaries)} organisations for logged in user. Getting extra info for each organisation..."
         )
