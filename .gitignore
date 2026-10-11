@@ -25,6 +25,7 @@ __pycache__/
 .Python
 *.egg-info/
 .aws-sam/
+src/.sam-wheels/
 venv/
 env/
 ENV/
