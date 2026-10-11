@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from datetime import datetime, timezone
 
 from rer_scraper.smartsuite import RERSmartSuiteClient
 
@@ -54,6 +55,25 @@ def make_client() -> RERSmartSuiteClient:
     )
     client.ss.session = StubSession()  # type: ignore[assignment]
     return client
+
+
+def test_get_operations_filters_by_linked_scraper_record():
+    client = make_client()
+    captured: dict[str, object] = {}
+
+    def filter_records(table_id: str, fields_to_filter: list[object]):
+        captured["table_id"] = table_id
+        captured["fields_to_filter"] = fields_to_filter
+        return []
+
+    client.ss.filter_records = filter_records  # type: ignore[method-assign]
+
+    client.get_operations(datetime(2026, 10, 12, tzinfo=timezone.utc))
+
+    scraper_filter = captured["fields_to_filter"][0]  # type: ignore[index]
+    assert scraper_filter.field == "s902579400"
+    assert scraper_filter.comparison == "has_any_of"
+    assert scraper_filter.value == ["6a7104dc65c1e43caf1f2792"]
 
 
 def test_get_record_uses_record_endpoint():

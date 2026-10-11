@@ -89,8 +89,8 @@ class RERSmartSuiteClient(SmartSuiteClient):
         """Return pending scraper work."""
         scraper_filter = FilterElement(
             field="s902579400",  # Scraper field
-            comparison="is",
-            value="6a7104dc65c1e43caf1f2792",  # RER Scraper record ID
+            comparison="has_any_of",
+            value=["6a7104dc65c1e43caf1f2792"],  # RER Scraper record ID
         )
         next_run_filter = FilterElement(
             field="s8173a46ec",  # Run Next After field
