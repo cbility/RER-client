@@ -148,14 +148,12 @@ Resources:
     Properties:
       Enabled: true
       Name: RERSessionAuthApiKey
-      Value: !Ref SessionAuthApiKeyValue
 
   RERScraperApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
       Enabled: true
       Name: RERScraperApiKey
-      Value: !Ref ScraperApiKeyValue
 
   RERSessionAuthUsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
