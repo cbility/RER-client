@@ -41,7 +41,9 @@ def convert_postcode_to_coordinates(postcode: str) -> tuple[float | None, float 
     try:
         return data["result"]["latitude"], data["result"]["longitude"]
     except (KeyError, TypeError) as e:
-        logger.error(f"Failed to convert postcode '{postcode}' to coordinates: {e}")
+        logger.error(
+            f"Failed to convert postcode '{postcode}' to coordinates: {e.with_traceback(None)}"
+        )
         return None, None
 
 
