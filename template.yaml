@@ -20,10 +20,6 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
-  ScraperApiKeyValue:
-    Type: String
-    NoEcho: true
-    Default: ""
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
