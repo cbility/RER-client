@@ -36,7 +36,7 @@ def build_service(dry_run: bool = False) -> RERScraperService:
     auth_api_url = os.getenv("RER_SESSION_AUTH_API_URL")
     auth_api_key = os.getenv("RER_SESSION_AUTH_API_KEY_VALUE")
     smartsuite_account_id = os.getenv("SMARTSUITE_ACCOUNT_ID")
-    smartsuite_api_key = os.getenv("SMARTSUITE_API_KEY")
+    smartsuite_api_key = os.getenv("SMARTSUITE_API_TOKEN")
     ss_login_record_id = "6a7f301f54fd4d6f819c1e5f"
 
     if not function_name:
@@ -49,7 +49,7 @@ def build_service(dry_run: bool = False) -> RERScraperService:
         )
     if not smartsuite_account_id or not smartsuite_api_key:
         raise RuntimeError(
-            "Set SMARTSUITE_ACCOUNT_ID and SMARTSUITE_API_KEY environment variables."
+            "Set SMARTSUITE_ACCOUNT_ID and SMARTSUITE_API_TOKEN environment variables."
         )
 
     return RERScraperService(
