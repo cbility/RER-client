@@ -428,7 +428,16 @@ def _parse_certificates_overview(
         if not h2:
             continue
         cert_type_label = h2.text(strip=True)  # e.g. "REGOs issued" or "ROCs issued"
-        cert_type = "REGO" if "REGO" in cert_type_label else "ROC"
+        cert_type_by_heading = {
+            "REGOs issued": "REGO",
+            "ROCs issued": "ROC",
+        }
+        try:
+            cert_type = cert_type_by_heading[cert_type_label]
+        except KeyError:
+            raise ValueError(
+                f"Unrecognized certificate type heading: {cert_type_label!r}"
+            ) from None
 
         # issued count: text of the strong figure after removing the h2
         figure_el = stat_el.css_first(".ofgem-rer-stat__figure")
@@ -448,6 +457,20 @@ def _parse_certificates_overview(
                 balance = int(dd.text(strip=True).replace(",", ""))
             except ValueError:
                 balance = None
+        elif cert_type == "ROC":
+            table = grid_row.css_first("table")
+            if table:
+                balance = 0
+                for table_row in table.css("tbody tr"):
+                    cells = table_row.css("td")
+                    if len(cells) < 2:
+                        balance = None
+                        break
+                    try:
+                        balance += int(cells[1].text(strip=True).replace(",", ""))
+                    except ValueError:
+                        balance = None
+                        break
 
         # links
         links = grid_row.css("a.ofgem-rer-certificate-dashboard-summary__link")
