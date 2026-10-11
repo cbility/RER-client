@@ -301,9 +301,7 @@ def main():
             # 9. Individual station details (from stations list)
             try:
                 stations = client.get_organisation_stations(org_id)
-                for station in stations.stations[
-                    :5
-                ]:  # Limit to first 5 stations to avoid too many requests
+                for station in stations.stations:
                     station_id = station.station_id
                     log.info(
                         f"    Fetching station: {station.station_name} ({station_id})"
