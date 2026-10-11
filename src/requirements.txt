@@ -1,3 +1,7 @@
 pydantic>=2.0
+python-dateutil>=2.9.0.post0
+python-dotenv>=1.2.1
+pytz>=2026.4
 requests>=2.32.5
 selectolax>=0.4.7
+smartsuite-python @ git+https://github.com/cbility/smartsuite-python.git
