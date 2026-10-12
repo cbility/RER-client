@@ -94,9 +94,9 @@ class RERSmartSuiteClient(SmartSuiteClient):
         )
         next_run_filter = FilterElement(
             field="s8173a46ec",  # Run Next After field
-            comparison="is_on_or_after",
+            comparison="is_on_or_before",
             value=FilterDateValue(
-                date_mode="exact_date", date_mode_value=launch_time.isoformat()
+                date_mode="exact_date", date_mode_value=launch_time.isoformat()[:19]
             ),
         )
         operations_records = self.ss.filter_records(

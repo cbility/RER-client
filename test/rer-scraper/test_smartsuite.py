@@ -75,6 +75,12 @@ def test_get_operations_filters_by_linked_scraper_record():
     assert scraper_filter.comparison == "has_any_of"
     assert scraper_filter.value == ["6a7104dc65c1e43caf1f2792"]
 
+    next_run_filter = captured["fields_to_filter"][1]  # type: ignore[index]
+    assert next_run_filter.field == "s8173a46ec"
+    assert next_run_filter.comparison == "is_on_or_before"
+    assert next_run_filter.value.date_mode == "exact_date"
+    assert next_run_filter.value.date_mode_value == "2026-10-12"
+
 
 def test_get_record_uses_record_endpoint():
     client = make_client()
