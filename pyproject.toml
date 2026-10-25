@@ -5,6 +5,7 @@ description = "Automation-friendly client for the Renewable Electricity Register
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "openai>=3.37.0",
     "pydantic>=2.0",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.2.1",
