@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http import cookies
 import json
 import os
 from datetime import UTC, datetime
@@ -8,15 +9,7 @@ from typing import Protocol
 import requests
 
 
-class CookieStore(Protocol):
-    def load_auth_params(
-        self,
-    ) -> tuple[dict[str, str] | None, str | None, str | None]: ...
-
-    def save_cookies(self, cookies: dict[str, str]) -> None: ...
-
-
-class SmartSuiteCookieStore:
+class SmartSuiteUserDataStore:
     def __init__(
         self,
         api_url: str | None,
@@ -50,7 +43,7 @@ class SmartSuiteCookieStore:
         )
 
     @classmethod
-    def from_env(cls) -> "SmartSuiteCookieStore":
+    def from_env(cls) -> "SmartSuiteUserDataStore":
         return cls(
             api_url=os.getenv("SMARTSUITE_API_URL"),
             api_token=os.getenv("SMARTSUITE_API_TOKEN"),
@@ -64,7 +57,7 @@ class SmartSuiteCookieStore:
             timeout=int(os.getenv("SMARTSUITE_TIMEOUT_SECONDS", "30")),
         )
 
-    def load_auth_params(self) -> tuple[dict[str, str] | None, str | None, str | None]:
+    def load_auth_params(self) -> tuple[dict[str, str], str | None, str | None]:
         response = self.session.get(self._record_url(), timeout=self.timeout)
         response.raise_for_status()
         record = response.json()
@@ -73,10 +66,10 @@ class SmartSuiteCookieStore:
         email = record.get(self.email_field)
         password = record.get(self.password_field)
         if raw_value is None:
-            return None, email, password
+            return {}, email, password
 
         cookies = self._coerce_cookies(raw_value)
-        return cookies or None, email, password
+        return cookies or {}, email, password
 
     def save_cookies(self, cookies: dict[str, str]) -> None:
         payload: dict[str, str] = {
@@ -145,7 +138,3 @@ class SmartSuiteCookieStore:
             for name, value in cookies.items()
             if value is not None
         }
-
-
-def build_cookie_store() -> CookieStore:
-    return SmartSuiteCookieStore.from_env()

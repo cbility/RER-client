@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from rer_session_auth.store import SmartSuiteCookieStore
+from rer_session_auth.store import SmartSuiteUserDataStore
 
 
 class StubResponse:
@@ -39,8 +39,8 @@ class StubSession:
 
 def make_store(
     *, cookies_field: str = "session_cookies", refreshed_at_field: str | None = None
-) -> SmartSuiteCookieStore:
-    store = SmartSuiteCookieStore(
+) -> SmartSuiteUserDataStore:
+    store = SmartSuiteUserDataStore(
         api_url="https://app.smartsuite.com/api/v1",
         api_token="token-123",
         email_field="sb966ee382",
@@ -102,7 +102,7 @@ def test_save_cookies_patches_record_with_json_string():
 
 
 def test_validate_configuration_requires_account_id():
-    store = SmartSuiteCookieStore(
+    store = SmartSuiteUserDataStore(
         api_url="https://app.smartsuite.com/api/v1",
         api_token="token-123",
         account_id=None,

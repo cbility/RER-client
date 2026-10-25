@@ -4,15 +4,13 @@ import json
 import logging
 import os
 from typing import Any, Protocol
-import boto3  # type: ignore[import-not-found] - boto3 is included in lambda env and not needed locally
 
 from rer_session_auth.auth import (
     RERAuthConfig,
     are_cookies_valid,
     browser_authenticate_rer,
-    _sanitize_cookies,
 )
-from rer_session_auth.store import SmartSuiteCookieStore
+from rer_session_auth.store import SmartSuiteUserDataStore
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "WARNING").upper(),
@@ -27,6 +25,7 @@ class RefreshInvoker(Protocol):
 
 class Boto3RefreshInvoker:
     def __init__(self, function_name: str):
+        import boto3  # type: ignore[import-not-found] - boto3 is included in lambda env and not needed locally
 
         self.client = boto3.client("lambda")
         self.function_name = function_name
@@ -39,33 +38,12 @@ class Boto3RefreshInvoker:
         )
 
 
-class SessionCookieService:
-    def __init__(
-        self,
-        store: SmartSuiteCookieStore,
-        refresh_invoker: RefreshInvoker,
-        auth_config: RERAuthConfig,
-        function_name: str,
-    ):
-        self.store = store
-        self.refresh_invoker = refresh_invoker
-        self.auth_config = auth_config
-        self.function_name = function_name
-
-    def get_cookies(self) -> dict[str, Any]:
-        cached_cookies = _sanitize_cookies(self.store.load_auth_params()[0] or {})
-        return cached_cookies
-
-    def refresh_cookies(self) -> None:
-        log.info("Refreshing RER session cookies")
-        refreshed_cookies = _sanitize_cookies(
-            browser_authenticate_rer(self.auth_config)
-        )
-        log.info(
-            "RER authentication completed; saving %s cookies", len(refreshed_cookies)
-        )
-        self.store.save_cookies(refreshed_cookies)
-        log.info("Saved refreshed RER session cookies")
+def refresh_cookies(store: SmartSuiteUserDataStore, auth_config: RERAuthConfig) -> None:
+    log.info("Refreshing RER session cookies")
+    refreshed_cookies = browser_authenticate_rer(auth_config)
+    log.info("RER authentication completed; saving %s cookies", len(refreshed_cookies))
+    store.save_cookies(refreshed_cookies)
+    log.info("Saved refreshed RER session cookies")
 
 
 def _response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -76,30 +54,19 @@ def _response(status_code: int, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_cookie_service(context) -> SessionCookieService:
-    function_name = context.invoked_function_arn
-
-    store = SmartSuiteCookieStore.from_env()
-    auth_params = store.load_auth_params()
-    email = auth_params[1]
-    password = auth_params[2]
-
-    return SessionCookieService(
-        store=store,
-        refresh_invoker=Boto3RefreshInvoker(function_name),
-        auth_config=RERAuthConfig.from_env(email, password),
-        function_name=function_name,
-    )
-
-
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
-    service = build_cookie_service(context)
+    # get user data from smartsuite
+    store = SmartSuiteUserDataStore.from_env()
+    cookies, email, password = store.load_auth_params()
+
     if event.get("refresh_cookies") is True:
         # This code path is only reached when cookies are invalid and another lambda invocation has requested a refresh
-        service.refresh_cookies()
+        auth_config = RERAuthConfig.from_env(email, password)
+        refresh_cookies(store, auth_config)
         return None
+
     # Else get cookies and check validity
-    cookies = service.get_cookies()
+    auth_config = RERAuthConfig.from_env(email, password)
     if are_cookies_valid(cookies):
         log.info("Returning cached RER session cookies")
         return _response(200, {"cookies": cookies})
@@ -107,7 +74,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
         log.info(
             "Cached RER cookies are missing or invalid. Scheduling cookie refresh."
         )
-        service.refresh_invoker.invoke(payload={"refresh_cookies": True})
+        # asynchronously invoke the refresh of cookies
+        Boto3RefreshInvoker(context.invoked_function_arn).invoke(
+            payload={"refresh_cookies": True}
+        )
         return _response(
             202,
             {

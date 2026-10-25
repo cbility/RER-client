@@ -10,14 +10,14 @@ import pytest
 import requests
 from dotenv import load_dotenv
 
-from rer_session_auth.store import SmartSuiteCookieStore
+from rer_session_auth.store import SmartSuiteUserDataStore
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _load_live_store() -> SmartSuiteCookieStore:
+def _load_live_store() -> SmartSuiteUserDataStore:
     load_dotenv(REPO_ROOT / ".env")
-    store = SmartSuiteCookieStore.from_env()
+    store = SmartSuiteUserDataStore.from_env()
 
     missing = [
         name
@@ -35,7 +35,9 @@ def _load_live_store() -> SmartSuiteCookieStore:
     return store
 
 
-def _patch_raw_fields(store: SmartSuiteCookieStore, payload: dict[str, object]) -> None:
+def _patch_raw_fields(
+    store: SmartSuiteUserDataStore, payload: dict[str, object]
+) -> None:
     response = store.session.patch(
         store._record_url(), json=payload, timeout=store.timeout
     )
@@ -43,7 +45,7 @@ def _patch_raw_fields(store: SmartSuiteCookieStore, payload: dict[str, object]) 
 
 
 def _restore_record_fields(
-    store: SmartSuiteCookieStore, original_record: dict[str, object]
+    store: SmartSuiteUserDataStore, original_record: dict[str, object]
 ) -> None:
     restore_payload: dict[str, object] = {
         store.cookies_field: original_record.get(store.cookies_field, ""),
