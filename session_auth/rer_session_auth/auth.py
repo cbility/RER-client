@@ -400,7 +400,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 if captcha_error_text:
                     log.error(f"Captcha error message: {captcha_error_text}")
                     page.fill(captcha_input_selector, "")
-                    captcha_max_retries = 3
+                    captcha_max_retries = 10  # LLMs struggle with the captchas
                     retries = 0
 
                     while retries < captcha_max_retries:
