@@ -19,7 +19,7 @@ RER_BASE_URL = "https://rer.ofgem.gov.uk/"
 RER_SIGN_IN_URL = f"{RER_BASE_URL}Account/SignIn"
 RER_USER_URL = f"{RER_BASE_URL}User"
 MAKE_EMAILER_URL = "https://hook.eu2.make.com/xawri30n5fdswaet4672pl4vbs7imx8c"
-MAKE_GET_MFA_EMAILS_URL = "https://hook.eu1.make.com/7thmbhze9hiicw1uwxkvgw4z9j8xzx3c"
+MAKE_GET_MFA_EMAILS_URL = "https://hook.eu2.make.com/lcn1lkdpu74lux5xxrgigxgc5i2dqxoc"
 RER_DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -255,6 +255,7 @@ def get_gmail_messages() -> list[GmailMessage]:
             raise requests.HTTPError(
                 f"Failed to retrieve Gmail messages: {response.status_code}. Error: {response.text}"
             )
+        print(f"Response from Make.com: {response.text}")
         result = response.json()
         emails: list[GmailMessage] = json.loads(result["json"])
         print(f"Retrieved emails: {emails}")
