@@ -93,6 +93,8 @@ if __name__ == "__main__":
     import os
 
     os.environ["PLAYWRIGHT_HEADLESS"] = "0"
+    os.environ["RER_LOCAL_TEST"] = "1"
+    os.environ["LOG_LEVEL"] = "DEBUG"
 
     context = type(
         "Context", (), {"invoked_function_arn": "local-RERScraperFunction"}
