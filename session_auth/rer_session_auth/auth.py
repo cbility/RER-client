@@ -248,10 +248,9 @@ def _get_gmail_messages() -> list[GmailMessage]:
             raise requests.HTTPError(
                 f"Failed to retrieve Gmail messages: {response.status_code}. Error: {response.text}"
             )
-        log.debug(f"Response from Make.com: {response.text[:200]}...")
+        log.debug(f"Response from Make.com: {response.text[0:100]}...")
         result = response.json()
         emails: list[GmailMessage] = json.loads(result["json"])
-        log.debug(f"Retrieved {len(emails)} emails")
     except requests.HTTPError as e:
         log.error(f"Error fetching emails: {e}")
         raise
@@ -283,6 +282,10 @@ def _retrieve_mfa_code(
             if dt.datetime.fromisoformat(message["date"]).astimezone(uk_tz)
             > button_clicked_after
         ]
+        log.info(
+            f"Retrieved {len(messages_today)} emails, of which {len(messages_after_click)} are after the button click at {button_clicked_after}"
+        )
+        log.debug(f"Message times: {[message['date'] for message in messages_today]}")
 
         for message in messages_after_click:
             body_text = message["html"]
@@ -465,6 +468,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             page.click("#readOnlyEmail_ver_but_send")
             page.wait_for_load_state("networkidle")
 
+            log.info("Waiting for MFA code retrieval...")
             sleep(config.wait_between_retries)
             try:
                 mfa_code = _retrieve_mfa_code(
