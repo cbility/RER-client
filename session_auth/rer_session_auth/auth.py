@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import re
-from openai import OpenAI  # for captcha solving
+from google import genai
 from dataclasses import dataclass
 from time import sleep
 from typing import TypedDict
@@ -73,37 +73,30 @@ class GmailMessage(TypedDict):
 
 
 def _solve_captcha(image_data_url: str) -> str:
-    client = OpenAI()
 
-    log.info("Sending CAPTCHA to GPT-6.1-sol for solving")
-    response = client.responses.create(
-        model="gpt-4o",
-        # reasoning={"effort": "low"},
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": "What text does this image show? Return ONLY the exact text, no spaces, no explanations.",
-                    },
-                    {
-                        "type": "input_image",
-                        "image_url": image_data_url,
-                        "detail": "low",
-                    },
-                ],
-            }
-        ],
-        max_output_tokens=1000,  # about 1 pence
+    client = genai.Client()
+    log.info("Sending CAPTCHA to Gemini 3.8 Flash for solving")
+
+    # remove data: prefix from image url
+    image_data = (
+        image_data_url.split(",", 1)[1] if "," in image_data_url else image_data_url
     )
 
-    # Extract text from the response using the output_text helper
-    result = response.output_text
+    interaction = client.interactions.create(
+        model="gemini-3.8-flash",
+        input=[
+            {
+                "type": "text",
+                "text": "What text does this image show? Return ONLY the exact text, no spaces, no explanation.",
+            },
+            {"type": "image", "data": image_data, "mime_type": "image/jpeg"},
+        ],
+    )
+    result = interaction.output_text
 
     if not result:
         log.warning("No text found in response, dumping full response for debugging")
-        log.info("Full response: %s", response.model_dump())
+        log.info("Full response: %s", interaction)
         raise RuntimeError("Failed to extract text from response")
 
     log.info("CAPTCHA solution returned: %s", result.strip())
