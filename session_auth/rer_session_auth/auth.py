@@ -1,17 +1,19 @@
-from __future__ import annotations
+# region imports
 
-import base64
 import datetime as dt
 import json
 import logging
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from time import sleep
-from typing import NotRequired, TypedDict
+from typing import TypedDict
 
 import requests
+
+# endregion imports
+
+# region config
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +33,10 @@ RER_DEFAULT_HEADERS = {
     "Sec-Fetch-User": "?1",
 }
 
+# endregion config
+
+# region classes
+
 
 class MissingConfigurationError(RuntimeError):
     pass
@@ -40,10 +46,8 @@ class MissingConfigurationError(RuntimeError):
 class RERAuthConfig:
     email: str | None
     password: str | None
-    gmail_token_json: str | None
-    gmail_token_file: str | None
     headless: bool = True
-    max_retries: int = 3
+    max_retries: int = 2
     wait_between_retries: int = 15
 
     @classmethod
@@ -51,39 +55,20 @@ class RERAuthConfig:
         return cls(
             email=email,
             password=password,
-            gmail_token_json=os.getenv("GMAIL_TOKEN_JSON"),
-            gmail_token_file=os.getenv("GMAIL_TOKEN_FILE"),
             headless=_env_bool("PLAYWRIGHT_HEADLESS", True),
-            max_retries=int(os.getenv("RER_MFA_MAX_RETRIES", "3")),
+            max_retries=int(os.getenv("RER_MFA_MAX_RETRIES", "2")),
             wait_between_retries=int(os.getenv("RER_MFA_WAIT_SECONDS", "15")),
         )
-
-
-class GmailMessageBody(TypedDict):
-    data: str
-    size: int
-    attachmentId: NotRequired[str]
-
-
-class GmailMessagePart(TypedDict, total=False):
-    partId: str
-    mimeType: str
-    filename: str
-    body: GmailMessageBody
-    parts: list["GmailMessagePart"]
-
-
-class GmailMessagePayload(TypedDict, total=False):
-    partId: str
-    mimeType: str
-    filename: str
-    body: GmailMessageBody
-    parts: list[GmailMessagePart]
 
 
 class GmailMessage(TypedDict):
     date: str  # ISO string
     html: str  # message content
+
+
+# endregion classes
+
+# region helpers
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -93,11 +78,11 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.lower() in {"1", "true", "yes", "on"}
 
 
-def sanitize_cookies(cookies: dict[str, str]) -> dict[str, str]:
+def _sanitize_cookies(cookies: dict[str, str]) -> dict[str, str]:
     return {key: value for key, value in cookies.items() if not key.startswith("ai_")}
 
 
-def send_password_failure_notification(user_email: str, error_message: str) -> None:
+def _send_password_failure_notification(user_email: str, error_message: str) -> None:
     """Send email notification when password authentication fails.
 
     Args:
@@ -148,7 +133,7 @@ def send_password_failure_notification(user_email: str, error_message: str) -> N
         # Don't re-raise - we still want to raise the original auth error
 
 
-def send_mfa_retrieval_failure_notification(
+def _send_mfa_retrieval_failure_notification(
     user_email: str, error_message: str
 ) -> None:
     """Send email notification when MFA retrieval fails.
@@ -201,11 +186,7 @@ def send_mfa_retrieval_failure_notification(
         # Don't re-raise - we still want to raise the original auth error
 
 
-def build_cookie_header(cookies: dict[str, str]) -> str:
-    return "; ".join(f"{name}={value}" for name, value in cookies.items())
-
-
-def build_session(cookies: dict[str, str] | None = None) -> requests.Session:
+def _build_session(cookies: dict[str, str] | None = None) -> requests.Session:
     session = requests.Session()
     session.headers.update(RER_DEFAULT_HEADERS)
     if cookies:
@@ -213,35 +194,7 @@ def build_session(cookies: dict[str, str] | None = None) -> requests.Session:
     return session
 
 
-def are_cookies_valid(cookies: dict[str, str], timeout: int = 30) -> bool:
-    if not cookies:
-        return False
-
-    try:
-        response = build_session(cookies).get(
-            RER_USER_URL, timeout=timeout, allow_redirects=False
-        )
-    except requests.RequestException:
-        log.exception("Failed to validate cached RER cookies")
-        return False
-
-    if response.status_code != 200:
-        return False
-
-    location = response.headers.get("Location", "")
-    if "Account/SignIn" in location or "b2c_1a_rer_signin" in location:
-        return False
-
-    sign_in_markers = (
-        'id="signInName"',
-        'name="signInName"',
-        "b2c_1a_rer_signin",
-        "/Account/SignIn",
-    )
-    return not any(marker in response.text for marker in sign_in_markers)
-
-
-def get_gmail_messages() -> list[GmailMessage]:
+def _get_gmail_messages() -> list[GmailMessage]:
     """Retrieve Gmail messages received by energy.source.notifications@gmail.com in the last day that include the text 'New message from msverify' in the subject"""
     api_key = os.getenv("MAKE_API_KEY")
     if not api_key:
@@ -273,7 +226,7 @@ def get_gmail_messages() -> list[GmailMessage]:
     return emails
 
 
-def retrieve_mfa_code(
+def _retrieve_mfa_code(
     button_clicked_after: dt.datetime,
     max_retries: int,
     wait_between_retries: int,
@@ -282,7 +235,7 @@ def retrieve_mfa_code(
         log.info(
             "Attempting to retrieve MFA code (%s/%s)", retry_number + 1, max_retries
         )
-        messages_today = get_gmail_messages()
+        messages_today = _get_gmail_messages()
         messages_after_click = [
             message
             for message in messages_today
@@ -308,6 +261,39 @@ def retrieve_mfa_code(
         sleep(wait_between_retries)
 
     raise TimeoutError(f"Failed to retrieve MFA code after {max_retries} attempts.")
+
+
+# endregion helpers
+
+# region exports
+
+
+def are_cookies_valid(cookies: dict[str, str], timeout: int = 30) -> bool:
+    if not cookies:
+        return False
+
+    try:
+        response = _build_session(cookies).get(
+            RER_USER_URL, timeout=timeout, allow_redirects=False
+        )
+    except requests.RequestException:
+        log.exception("Failed to validate cached RER cookies")
+        return False
+
+    if response.status_code != 200:
+        return False
+
+    location = response.headers.get("Location", "")
+    if "Account/SignIn" in location or "b2c_1a_rer_signin" in location:
+        return False
+
+    sign_in_markers = (
+        'id="signInName"',
+        'name="signInName"',
+        "b2c_1a_rer_signin",
+        "/Account/SignIn",
+    )
+    return not any(marker in response.text for marker in sign_in_markers)
 
 
 def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
@@ -349,7 +335,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             if login_error_message:
                 error_text = login_error_message.inner_text()
                 # Send notification before raising error
-                send_password_failure_notification(config.email, error_text)
+                _send_password_failure_notification(config.email, error_text)
                 raise ValueError(f"Authentication failed: {error_text}")
 
             button_clicked_after = dt.datetime.now()
@@ -358,13 +344,13 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
 
             sleep(10)
             try:
-                mfa_code = retrieve_mfa_code(
+                mfa_code = _retrieve_mfa_code(
                     button_clicked_after=button_clicked_after,
                     max_retries=config.max_retries,
                     wait_between_retries=config.wait_between_retries,
                 )
             except TimeoutError as e:
-                send_mfa_retrieval_failure_notification(
+                _send_mfa_retrieval_failure_notification(
                     config.email,
                     str(e),
                 )
@@ -382,10 +368,13 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
 
             page.wait_for_url("https://rer.ofgem.gov.uk/**", timeout=300000)
             cookies = page.context.cookies()
-            sanitized_cookies = sanitize_cookies(
+            sanitized_cookies = _sanitize_cookies(
                 {cookie.get("name", ""): cookie.get("value", "") for cookie in cookies}
             )
             log.info("RER login produced %s cookies", len(sanitized_cookies))
             return sanitized_cookies
         finally:
             browser.close()
+
+
+# endregion exports
