@@ -90,6 +90,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
 
 if __name__ == "__main__":
 
+    import os
+
+    os.environ["PLAYWRIGHT_HEADLESS"] = "0"
+
     context = type(
         "Context", (), {"invoked_function_arn": "local-RERScraperFunction"}
     )()
