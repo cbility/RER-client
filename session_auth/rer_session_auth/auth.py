@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+from openai import OpenAI  # for captcha solving
 from dataclasses import dataclass
 from time import sleep
 from typing import TypedDict
@@ -69,6 +70,44 @@ class GmailMessage(TypedDict):
 # endregion classes
 
 # region helpers
+
+
+def _solve_captcha(image_data_url: str) -> str:
+    client = OpenAI()
+
+    log.info("Sending CAPTCHA to GPT-6.1-sol for solving")
+    response = client.responses.create(
+        model="gpt-4o",
+        # reasoning={"effort": "low"},
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": "What text does this image show? Return ONLY the exact text, no spaces, no explanations.",
+                    },
+                    {
+                        "type": "input_image",
+                        "image_url": image_data_url,
+                        "detail": "low",
+                    },
+                ],
+            }
+        ],
+        max_output_tokens=1000,  # about 1 pence
+    )
+
+    # Extract text from the response using the output_text helper
+    result = response.output_text
+
+    if not result:
+        log.warning("No text found in response, dumping full response for debugging")
+        log.info("Full response: %s", response.model_dump())
+        raise RuntimeError("Failed to extract text from response")
+
+    log.info("CAPTCHA solution returned: %s", result.strip())
+    return result.strip()
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -208,10 +247,10 @@ def _get_gmail_messages() -> list[GmailMessage]:
             raise requests.HTTPError(
                 f"Failed to retrieve Gmail messages: {response.status_code}. Error: {response.text}"
             )
-        print(f"Response from Make.com: {response.text}")
+        log.debug(f"Response from Make.com: {response.text[:200]}...")
         result = response.json()
         emails: list[GmailMessage] = json.loads(result["json"])
-        print(f"Retrieved emails: {emails}")
+        log.debug(f"Retrieved {len(emails)} emails")
     except requests.HTTPError as e:
         log.error(f"Error fetching emails: {e}")
         raise
@@ -244,7 +283,7 @@ def _retrieve_mfa_code(
 
         for message in messages_after_click:
             body_text = message["html"]
-            print(body_text)
+            log.debug(body_text)
             if "RER-External-prd authentication" not in body_text:
                 continue
 
@@ -323,26 +362,93 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
         try:
             page.goto(RER_SIGN_IN_URL)
             page.wait_for_url("**/b2c_1a_rer_signin/**")
+            page.wait_for_load_state("networkidle")
 
             page.fill("#signInName", config.email)
             page.fill("#password", config.password)
-            page.click("button:has-text('Sign in')")
+            captcha_image_url_node = page.query_selector(
+                "#captchaControlChallengeCode-img"
+            )
+            if not captcha_image_url_node:
+                raise RuntimeError("Failed to locate CAPTCHA image on the page")
+
+            captcha_image_url = captcha_image_url_node.get_attribute("src")
+            if not captcha_image_url:
+                raise RuntimeError("Failed to retrieve CAPTCHA image URL")
+
+            captcha_solution = _solve_captcha(captcha_image_url)
+            page.fill("#captchaControlChallengeCode", captcha_solution)
+
+            # attempt sign in
+            page.click("#next")
             page.wait_for_load_state("networkidle")
 
-            login_error_message = page.query_selector(
-                "#localAccountForm > div.error.pageLevel > p"
+            # Wait for error messages to appear
+            sleep(2)
+
+            # check for captcha failure - error appears in specific p element
+            # Selector from browser: #localAccountForm > div.entry > div.CaptchaControl.entry-item.captchaControlChallengeCode_section > div.error.itemLevel > p
+            log.info("Checking for CAPTCHA error...")
+            captcha_error_selector = "#localAccountForm > div.entry > div.CaptchaControl.entry-item.captchaControlChallengeCode_section > div.error.itemLevel > p"
+            captcha_error_node = page.query_selector(captcha_error_selector)
+            if captcha_error_node:
+                captcha_error_text = captcha_error_node.text_content()
+                log.info(f"CAPTCHA error text: {captcha_error_text}")
+                if captcha_error_text:
+                    log.error(f"Captcha error message: {captcha_error_text}")
+                    captcha_max_retries = 3
+                    retries = 0
+
+                    while retries < captcha_max_retries:
+                        log.info(
+                            f"Captcha failed. Retrying... (attempt {retries + 1} of {captcha_max_retries})"
+                        )
+                        retries += 1
+
+                        captcha_solution = _solve_captcha(captcha_image_url)
+
+                        page.fill("#captchaControlChallengeCode", captcha_solution)
+                        page.click("#next")
+                        page.wait_for_load_state("networkidle")
+                        sleep(2)
+
+                        # Re-check for CAPTCHA error
+                        captcha_error_node = page.query_selector(captcha_error_selector)
+                        if not captcha_error_node:
+                            log.info("No CAPTCHA error found - moving on")
+                            break
+
+                        captcha_error_text = captcha_error_node.text_content()
+                        log.info(f"CAPTCHA still failed: {captcha_error_text}")
+
+                    if retries >= captcha_max_retries:
+                        log.error(
+                            f"Maximum CAPTCHA retries of {captcha_max_retries} exceeded"
+                        )
+                        _send_password_failure_notification(
+                            config.email, captcha_error_text or ""
+                        )
+                        raise ValueError(f"Authentication failed: {captcha_error_text}")
+
+            # check for generic login errors (e.g., wrong password)
+            # Password errors appear in p element within form error div
+            login_error_node = page.query_selector(
+                "#localAccountForm > div.entry > div.error.itemLevel > p"
             )
-            if login_error_message:
-                error_text = login_error_message.inner_text()
-                # Send notification before raising error
-                _send_password_failure_notification(config.email, error_text)
-                raise ValueError(f"Authentication failed: {error_text}")
+
+            if login_error_node:
+                error_text = login_error_node.text_content()
+                if error_text:
+                    # Send notification before raising error
+                    log.error(f"Authentication failed with message: {error_text}")
+                    _send_password_failure_notification(config.email, error_text)
+                    raise ValueError(f"Authentication failed: {error_text}")
 
             button_clicked_after = dt.datetime.now()
-            page.click("#sendCode")
+            page.click("#readOnlyEmail_ver_but_send")
             page.wait_for_load_state("networkidle")
 
-            sleep(10)
+            sleep(config.wait_between_retries)
             try:
                 mfa_code = _retrieve_mfa_code(
                     button_clicked_after=button_clicked_after,
