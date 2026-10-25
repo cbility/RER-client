@@ -78,8 +78,8 @@ def _solve_captcha(image_data_url: str) -> str:
 
     log.info("Sending CAPTCHA to GPT-6.1-sol for solving")
     response = client.responses.create(
-        model="gpt-4o",
-        # reasoning={"effort": "low"},
+        model="gpt-6.1-sol",
+        reasoning={"effort": "medium"},
         input=[
             {
                 "role": "user",
@@ -91,7 +91,7 @@ def _solve_captcha(image_data_url: str) -> str:
                     {
                         "type": "input_image",
                         "image_url": image_data_url,
-                        "detail": "low",
+                        "detail": "auto",
                     },
                 ],
             }
@@ -396,8 +396,8 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             captcha_error_node = page.query_selector(captcha_error_selector)
             if captcha_error_node:
                 captcha_error_text = captcha_error_node.text_content()
-                log.info(f"CAPTCHA error text: {captcha_error_text}")
                 if captcha_error_text:
+                    log.info(f"CAPTCHA error text: {captcha_error_text}")
                     log.error(f"Captcha error message: {captcha_error_text}")
                     captcha_max_retries = 3
                     retries = 0
