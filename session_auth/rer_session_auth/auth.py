@@ -380,7 +380,8 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 raise RuntimeError("Failed to retrieve CAPTCHA image URL")
 
             captcha_solution = _solve_captcha(captcha_image_url)
-            page.fill("#captchaControlChallengeCode", captcha_solution)
+            captcha_input_selector = "#captchaControlChallengeCode"
+            page.fill(captcha_input_selector, captcha_solution)
 
             # attempt sign in
             page.click("#next")
@@ -397,8 +398,8 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             if captcha_error_node:
                 captcha_error_text = captcha_error_node.text_content()
                 if captcha_error_text:
-                    log.info(f"CAPTCHA error text: {captcha_error_text}")
                     log.error(f"Captcha error message: {captcha_error_text}")
+                    page.fill(captcha_input_selector, "")
                     captcha_max_retries = 3
                     retries = 0
 
@@ -408,9 +409,20 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                         )
                         retries += 1
 
+                        captcha_image_url_node = page.query_selector(
+                            "#captchaControlChallengeCode-img"
+                        )
+                        if not captcha_image_url_node:
+                            raise RuntimeError(
+                                "Failed to locate CAPTCHA image on the page"
+                            )
+                        captcha_image_url = captcha_image_url_node.get_attribute("src")
+                        if not captcha_image_url:
+                            raise RuntimeError("Failed to retrieve CAPTCHA image URL")
+
                         captcha_solution = _solve_captcha(captcha_image_url)
 
-                        page.fill("#captchaControlChallengeCode", captcha_solution)
+                        page.fill(captcha_input_selector, captcha_solution)
                         page.click("#next")
                         page.wait_for_load_state("networkidle")
                         sleep(2)
