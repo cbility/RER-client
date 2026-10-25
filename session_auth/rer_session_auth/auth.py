@@ -275,10 +275,12 @@ def _retrieve_mfa_code(
             "Attempting to retrieve MFA code (%s/%s)", retry_number + 1, max_retries
         )
         messages_today = _get_gmail_messages()
+        uk_tz = ZoneInfo("Europe/London")
         messages_after_click = [
             message
             for message in messages_today
-            if dt.datetime.fromisoformat(message["date"]) > button_clicked_after
+            if dt.datetime.fromisoformat(message["date"]).astimezone(uk_tz)
+            > button_clicked_after
         ]
 
         for message in messages_after_click:
@@ -444,7 +446,9 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                     _send_password_failure_notification(config.email, error_text)
                     raise ValueError(f"Authentication failed: {error_text}")
 
-            button_clicked_after = dt.datetime.now()
+            uk_tz = ZoneInfo("Europe/London")
+            button_clicked_after = dt.datetime.now(uk_tz)
+            log.info("Clicking to send MFA code")
             page.click("#readOnlyEmail_ver_but_send")
             page.wait_for_load_state("networkidle")
 
