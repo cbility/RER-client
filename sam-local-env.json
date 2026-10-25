@@ -1,0 +1,10 @@
+{
+  "RERScraperFunction": {
+    "AWS_LAMBDA_FUNCTION_NAME": "local-RERScraperFunction",
+    "RER_SESSION_AUTH_API_URL": "https://jofy3f7p43.execute-api.eu-west-2.amazonaws.com/Prod/",
+    "RER_SESSION_AUTH_API_KEY_VALUE": "your-api-key-here",
+    "SMARTSUITE_ACCOUNT_ID": "s5ch1upc",
+    "SMARTSUITE_API_TOKEN": "",
+    "RER_LOCAL_TEST": "1"
+  }
+}

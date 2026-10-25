@@ -17,6 +17,14 @@ class SessionRefreshPending(RuntimeError):
     pass
 
 
+class NoOpRetryInvoker:
+    """Local test retry invoker that does nothing (prevents Lambda invoke calls)."""
+
+    def invoke(self, function_name: str, payload: dict[str, Any]) -> None:
+        # In local mode, skip retry invocation
+        pass
+
+
 class Boto3RetryInvoker:
     def __init__(self):
         import boto3  # type: ignore[import-not-found]
@@ -38,8 +46,11 @@ def build_service(dry_run: bool = False) -> RERScraperService:
     smartsuite_account_id = os.getenv("SMARTSUITE_ACCOUNT_ID")
     smartsuite_api_key = os.getenv("SMARTSUITE_API_TOKEN")
     ss_login_record_id = "6a7f301f54fd4d6f819c1e5f"
+    
+    # Check if running in local test mode
+    is_local_test = os.getenv("RER_LOCAL_TEST") is not None
 
-    if not function_name:
+    if not is_local_test and not function_name:
         raise RuntimeError(
             "AWS_LAMBDA_FUNCTION_NAME is required to schedule a scraper retry."
         )
@@ -52,13 +63,16 @@ def build_service(dry_run: bool = False) -> RERScraperService:
             "Set SMARTSUITE_ACCOUNT_ID and SMARTSUITE_API_TOKEN environment variables."
         )
 
+    # Use NoOpRetryInvoker for local testing, Boto3RetryInvoker for production
+    retry_invoker = NoOpRetryInvoker() if is_local_test else Boto3RetryInvoker()
+
     return RERScraperService(
         smartsuite=RERSmartSuiteClient(
             account_id=smartsuite_account_id, api_token=smartsuite_api_key
         ),
         session_auth=SessionAuthClient(auth_api_url, auth_api_key),
-        retry_invoker=Boto3RetryInvoker(),
-        function_name=function_name,
+        retry_invoker=retry_invoker,
+        function_name=function_name or "local-RERScraperFunction",
         ss_login_record_id=ss_login_record_id,
         dry_run=dry_run,
     )

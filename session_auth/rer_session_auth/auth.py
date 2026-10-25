@@ -9,6 +9,7 @@ from google import genai
 from dataclasses import dataclass
 from time import sleep
 from typing import TypedDict
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -388,8 +389,8 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             captcha_error_node = page.query_selector(captcha_error_selector)
             if captcha_error_node:
                 captcha_error_text = captcha_error_node.text_content()
-                log.info(f"CAPTCHA error text: {captcha_error_text}")
                 if captcha_error_text:
+                    log.info(f"CAPTCHA error text: {captcha_error_text}")
                     log.error(f"Captcha error message: {captcha_error_text}")
                     captcha_max_retries = 3
                     retries = 0
