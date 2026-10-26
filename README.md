@@ -32,7 +32,6 @@ Create a local `.env` file with the deployment values. It must include:
 ```dotenv
 RER_EMAIL=...
 RER_PASSWORD=...
-GMAIL_TOKEN_JSON='...authorized-user-token-json...'
 SMARTSUITE_API_TOKEN=...
 SMARTSUITE_ACCOUNT_ID=...
 SMARTSUITE_TABLE_ID=...
@@ -52,8 +51,7 @@ sam deploy
 
 Run `sam deploy` after code or infrastructure changes. Run
 `./scripts/sync-session-auth-env.sh` after every deployment and whenever `.env`
-values change. The sync script preserves JSON values such as `GMAIL_TOKEN_JSON`
-by updating the Lambda environment through the AWS CLI structured JSON API.
+values change. The sync script updates the Lambda environment through the AWS CLI structured JSON API.
 
 The scraper Lambda requires separate configuration after deployment:
 

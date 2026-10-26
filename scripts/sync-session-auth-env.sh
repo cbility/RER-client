@@ -11,7 +11,6 @@ set +a
 
 : "${RER_EMAIL:?Set RER_EMAIL in .env}"
 : "${RER_PASSWORD:?Set RER_PASSWORD in .env}"
-: "${GMAIL_TOKEN_JSON:?Set GMAIL_TOKEN_JSON in .env}"
 : "${SMARTSUITE_API_TOKEN:?Set SMARTSUITE_API_TOKEN in .env}"
 : "${SMARTSUITE_ACCOUNT_ID:?Set SMARTSUITE_ACCOUNT_ID in .env}"
 : "${SMARTSUITE_TABLE_ID:?Set SMARTSUITE_TABLE_ID in .env}"
@@ -32,8 +31,6 @@ environment = {
         "RER_MFA_WAIT_SECONDS": os.environ.get("RER_MFA_WAIT_SECONDS", "10"),
         "RER_EMAIL": os.environ["RER_EMAIL"],
         "RER_PASSWORD": os.environ["RER_PASSWORD"],
-        "GMAIL_TOKEN_JSON": os.environ["GMAIL_TOKEN_JSON"],
-        "GMAIL_TOKEN_FILE": os.environ.get("GMAIL_TOKEN_FILE", ""),
         "SMARTSUITE_API_URL": os.environ.get("SMARTSUITE_API_URL", "https://app.smartsuite.com/api/v1"),
         "SMARTSUITE_API_TOKEN": os.environ["SMARTSUITE_API_TOKEN"],
         "SMARTSUITE_ACCOUNT_ID": os.environ["SMARTSUITE_ACCOUNT_ID"],

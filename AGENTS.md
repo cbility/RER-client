@@ -16,12 +16,11 @@
 
 ## Live Test Rules
 - `test/rer-python/conftest.py` skips the suite if `rer_cookies.json` is missing or invalid.
-- Keep `rer_cookies.json`, `gmail_credentials.json`, `gmail_token.json`, and `.env` out of git; they are already ignored.
+- Keep `rer_cookies.json` and `.env` out of git; they are already ignored.
 - Run repo-root-relative scripts from the repository root so cookie and token paths resolve correctly.
 
 ## Cookie Bootstrap
 - `test/bootstrap_rer_cookies.py` needs `RER_EMAIL` and `RER_PASSWORD` from `.env` or flags.
-- The bootstrap flow also needs a valid Gmail OAuth token file at `gmail_token.json` and uses Playwright plus the Gmail API.
 - Saved cookies strip `ai_` tracking cookies before writing `rer_cookies.json`.
 
 ## Notes

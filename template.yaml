@@ -8,10 +8,6 @@ Description: >
   AWS lambda function for running https://github.com/cbility/RER-client
 
 Parameters:
-  GmailTokenJson:
-    Type: String
-    NoEcho: true
-    Default: ""
   SmartSuiteApiToken:
     Type: String
     NoEcho: true
@@ -55,7 +51,6 @@ Resources:
           PLAYWRIGHT_HEADLESS: "true"
           RER_MFA_MAX_RETRIES: "5"
           RER_MFA_WAIT_SECONDS: "10"
-          GMAIL_TOKEN_JSON: !Ref GmailTokenJson
           SMARTSUITE_API_URL: "https://app.smartsuite.com/api/v1"
           SMARTSUITE_API_TOKEN: !Ref SmartSuiteApiToken
           SMARTSUITE_ACCOUNT_ID: "s5ch1upc"
