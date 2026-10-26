@@ -12,6 +12,7 @@ set +a
 : "${RER_EMAIL:?Set RER_EMAIL in .env}"
 : "${RER_PASSWORD:?Set RER_PASSWORD in .env}"
 : "${SMARTSUITE_API_TOKEN:?Set SMARTSUITE_API_TOKEN in .env}"
+: "${MAKE_API_KEY:?Set MAKE_API_KEY in .env}"
 : "${SMARTSUITE_ACCOUNT_ID:?Set SMARTSUITE_ACCOUNT_ID in .env}"
 : "${SMARTSUITE_TABLE_ID:?Set SMARTSUITE_TABLE_ID in .env}"
 : "${SMARTSUITE_RECORD_ID:?Set SMARTSUITE_RECORD_ID in .env}"
@@ -33,6 +34,7 @@ environment = {
         "RER_PASSWORD": os.environ["RER_PASSWORD"],
         "SMARTSUITE_API_URL": os.environ.get("SMARTSUITE_API_URL", "https://app.smartsuite.com/api/v1"),
         "SMARTSUITE_API_TOKEN": os.environ["SMARTSUITE_API_TOKEN"],
+        "MAKE_API_KEY": os.environ["MAKE_API_KEY"],
         "SMARTSUITE_ACCOUNT_ID": os.environ["SMARTSUITE_ACCOUNT_ID"],
         "SMARTSUITE_TABLE_ID": os.environ["SMARTSUITE_TABLE_ID"],
         "SMARTSUITE_RECORD_ID": os.environ["SMARTSUITE_RECORD_ID"],

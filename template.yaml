@@ -16,6 +16,10 @@ Parameters:
     Type: String
     NoEcho: true
     Default: ""
+  MakeApiKeyValue:
+    Type: String
+    NoEcho: true
+    Default: ""
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -59,6 +63,7 @@ Resources:
           SMARTSUITE_COOKIES_FIELD: "s5e77b7ce0"
           SMARTSUITE_REFRESHED_AT_FIELD: ""
           SMARTSUITE_TIMEOUT_SECONDS: "30"
+          MAKE_API_KEY: !Ref MakeApiKeyValue
       Policies:
         - Statement:
             - Effect: Allow

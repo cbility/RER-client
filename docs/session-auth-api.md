@@ -73,6 +73,7 @@ The deployed session-auth Lambda expects these environment variables to be confi
 - `RER_EMAIL`
 - `RER_PASSWORD`
 - `SMARTSUITE_API_TOKEN`
+- `MAKE_API_KEY`
 - `SMARTSUITE_ACCOUNT_ID`
 - `SMARTSUITE_TABLE_ID`
 - `SMARTSUITE_RECORD_ID`
