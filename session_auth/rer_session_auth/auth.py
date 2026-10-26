@@ -295,7 +295,7 @@ def _retrieve_mfa_code(
             match = re.search(r"Your code is: (\d{6})", body_text)
             if match:
                 log.info(
-                    "Found a matching RER MFA email on attempt %s", retry_number + 1
+                    f"Found a matching RER MFA email on attempt {retry_number + 1}: {match.group(1)}",
                 )
                 return match.group(1)
 
@@ -469,7 +469,9 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
             page.click("#readOnlyEmail_ver_but_send")
             page.wait_for_load_state("networkidle")
 
-            log.info("Waiting for MFA code retrieval...")
+            log.info(
+                f"Waiting {config.wait_between_retries} seconds before MFA code retrieval..."
+            )
             sleep(config.wait_between_retries)
             try:
                 mfa_code = _retrieve_mfa_code(
@@ -484,15 +486,10 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 )
                 raise e
 
-            page.fill("#verificationCode", mfa_code)
-            page.click("#verifyCode")
+            page.fill("#readOnlyEmail_ver_input", mfa_code)
+            page.click("#readOnlyEmail_ver_but_verify")
             page.wait_for_load_state("networkidle")
-
-            error_message = page.query_selector("div.error:nth-child(2)")
-            if error_message:
-                error_text = error_message.inner_text().strip()
-                if error_text:
-                    raise ValueError(f"MFA verification failed: {error_text}")
+            page.click("#continue")
 
             page.wait_for_url("https://rer.ofgem.gov.uk/**", timeout=300000)
             cookies = page.context.cookies()
