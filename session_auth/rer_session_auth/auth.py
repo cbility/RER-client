@@ -402,7 +402,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 if captcha_error_text:
                     log.error(f"Captcha error message: {captcha_error_text}")
 
-                    captcha_max_retries = 10  # LLMs struggle with the captchas
+                    captcha_max_retries = 10  # LLMs struggle with the captchas. Portal limits attempts to 5, but maybe that will increase
                     retries = 0
 
                     while retries < captcha_max_retries:
