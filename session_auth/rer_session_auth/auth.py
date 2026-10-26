@@ -289,11 +289,10 @@ def _retrieve_mfa_code(
 
         for message in messages_after_click:
             body_text = message["html"]
-            log.debug(body_text)
-            if "RER-External-prd authentication" not in body_text:
-                continue
+            if "Your code is: " not in body_text:
+                raise ValueError("Unexpected email format: missing 'Your code is: '")
 
-            match = re.search(r"verification code (\d{6})", body_text)
+            match = re.search(r"Your code is: (\d{6})", body_text)
             if match:
                 log.info(
                     "Found a matching RER MFA email on attempt %s", retry_number + 1
@@ -402,11 +401,12 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                 captcha_error_text = captcha_error_node.text_content()
                 if captcha_error_text:
                     log.error(f"Captcha error message: {captcha_error_text}")
-                    page.fill(captcha_input_selector, "")
+
                     captcha_max_retries = 10  # LLMs struggle with the captchas
                     retries = 0
 
                     while retries < captcha_max_retries:
+                        page.fill(captcha_input_selector, "")
                         log.info(
                             f"Captcha failed. Retrying... (attempt {retries + 1} of {captcha_max_retries})"
                         )
@@ -426,6 +426,7 @@ def browser_authenticate_rer(config: RERAuthConfig) -> dict[str, str]:
                         captcha_solution = _solve_captcha(captcha_image_url)
 
                         page.fill(captcha_input_selector, captcha_solution)
+                        sleep(2)
                         page.click("#next")
                         page.wait_for_load_state("networkidle")
                         sleep(2)
