@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import runpy
+from typing import Any, cast
 from unittest.mock import Mock
 
-from rer_client.models import OrganisationSummary
+from rer_client.models import OrganisationSummary, User
 from rer_scraper.service import RERScraperService
 
 scraper_handler = importlib.import_module("rer_scraper.handler")
@@ -29,7 +31,12 @@ def make_service(
 def test_handler_forwards_organisation_reference(monkeypatch):
     service = Mock()
     service.run.return_value = (204, None)
-    monkeypatch.setattr(scraper_handler, "build_service", lambda: service)
+
+    def fake_build_service(context: Any, dry_run: bool = False) -> Mock:
+        del context, dry_run
+        return service
+
+    monkeypatch.setattr(scraper_handler, "build_service", fake_build_service)
 
     response = scraper_handler.handler(
         {"queryStringParameters": {"organisation_reference": "GEN0191576"}}, None
@@ -37,6 +44,30 @@ def test_handler_forwards_organisation_reference(monkeypatch):
 
     assert response == {"statusCode": 204}
     service.run.assert_called_once_with(organisation_reference="GEN0191576")
+
+
+def test_local_handler_runs_inline_without_aws(monkeypatch):
+    for name in (
+        "RER_SESSION_AUTH_API_URL",
+        "RER_SESSION_AUTH_API_KEY_VALUE",
+        "SMARTSUITE_ACCOUNT_ID",
+        "SMARTSUITE_API_TOKEN",
+    ):
+        monkeypatch.setenv(name, "test")
+    monkeypatch.setattr("dotenv.load_dotenv", Mock())
+    service = Mock()
+    service.run.return_value = (200, None)
+    service_factory = Mock(return_value=service)
+    monkeypatch.setattr("rer_scraper.service.RERScraperService", service_factory)
+    monkeypatch.setattr("rer_scraper.smartsuite.RERSmartSuiteClient", Mock())
+
+    assert scraper_handler.__file__
+    runpy.run_path(scraper_handler.__file__, run_name="__main__")
+
+    assert service_factory.call_args.kwargs["dry_run"] is True
+    service.run.assert_called_once_with(
+        schedule_retry=False, organisation_reference=None
+    )
 
 
 def test_targeted_refresh_retries_with_organisation_reference():
@@ -53,6 +84,25 @@ def test_targeted_refresh_retries_with_organisation_reference():
             "queryStringParameters": {"organisation_reference": "GEN0191576"},
         },
     )
+
+
+def test_user_update_uses_configured_login_record_id(monkeypatch):
+    monkeypatch.delenv("SMARTSUITE_RECORD_ID", raising=False)
+    service = make_service({"session": "cookie"})
+    user = User(
+        email="user@example.com",
+        full_name="Test User",
+        outstanding_tasks=0,
+        active_organisations=0,
+    )
+    smartsuite_mock = cast(Any, service.smartsuite)
+    smartsuite_mock.map_user.return_value = {"email": user.email}
+
+    service.update_rer_user(user)
+
+    smartsuite_mock.update_user.assert_called_once()
+    user_record = smartsuite_mock.update_user.call_args.args[0]
+    assert user_record["id"] == "user-record"
 
 
 def test_targeted_refresh_skips_user_update():
