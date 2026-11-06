@@ -13,26 +13,29 @@ from rer_scraper.service import (
 from rer_scraper.smartsuite import RERSmartSuiteClient
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+
+
 class SessionRefreshPending(RuntimeError):
     pass
 
 
 class Boto3RetryInvoker:
-    def __init__(self):
+    def invoke(self, function_name: str, payload: dict[str, Any]) -> None:
         import boto3  # type: ignore[import-not-found]
 
-        self.client = boto3.client("lambda")
-
-    def invoke(self, function_name: str, payload: dict[str, Any]) -> None:
-        self.client.invoke(
+        boto3.client("lambda").invoke(
             FunctionName=function_name,
             InvocationType="Event",
             Payload=json.dumps(payload).encode("utf-8"),
         )
 
 
-def build_service(dry_run: bool = False) -> RERScraperService:
-    function_name = os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+def build_service(context: Any, dry_run: bool = False) -> RERScraperService:
+    function_name = context.function_name
     auth_api_url = os.getenv("RER_SESSION_AUTH_API_URL")
     auth_api_key = os.getenv("RER_SESSION_AUTH_API_KEY_VALUE")
     smartsuite_account_id = os.getenv("SMARTSUITE_ACCOUNT_ID")
@@ -64,9 +67,10 @@ def build_service(dry_run: bool = False) -> RERScraperService:
     )
 
 
-def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
-    del context
-    service = build_service()
+def handler(
+    event: dict[str, Any], context: Any, dry_run: bool = False
+) -> dict[str, Any] | None:
+    service = build_service(context, dry_run=dry_run)
     organisation_reference = (event.get("queryStringParameters") or {}).get(
         "organisation_reference"
     )
@@ -92,3 +96,25 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any] | None:
         "headers": {"Content-Type": "application/json"},
         "body": RERScraperService.parse_scraper_result(result),
     }
+
+
+# region testing
+
+if __name__ == "__main__":
+    from types import SimpleNamespace
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+    logger.info(
+        "Starting handler locally in dry run mode. Use --no-dry-run to execute smartsuite writes."
+    )
+
+    # Reuse the retry path to run inline without scheduling an AWS invocation.
+    event = {"retry_scrape": True}
+    context = SimpleNamespace(function_name="local-RERScraperFunction")
+    result = handler(event, context, dry_run=True)
+    print(result)
+
+# endregion

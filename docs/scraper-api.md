@@ -1,5 +1,16 @@
 # RER Scraper API
 
+## Local debugging
+
+From the repository root, run `uv run python -m rer_scraper.handler`, or debug
+`src/rer_scraper/handler.py` in VS Code. The testing section loads `.env` and calls
+the real handler with `dry_run=True`: it reads live SmartSuite operations and RER
+data but skips SmartSuite writes and AWS retries. If there is no scheduled work,
+it exits without scraping. If session refresh is pending, it raises
+`SessionRefreshPending`; rerun once the session is ready.
+
+## API behavior
+
 `POST /` starts RER scraper work. The scraper first reads operations from
 SmartSuite, then exits with `204 No Content` when there is no work.
 

@@ -38,6 +38,7 @@ import logging
 
 # region configuration
 logger = logging.getLogger(__name__)
+logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 
 # endregion configuration
 
@@ -170,6 +171,7 @@ class RERScraperService:
     ) -> tuple[int, ScraperResult | None]:
         run_start = datetime.now(tz=pytz.timezone("Europe/London"))
         operations = self.smartsuite.get_operations(run_start)
+        logger.debug(f"Retrieved operations: {operations}")
         if len(operations) == 0:
             return 204, None  # successful run but no tasks scheduled
 
@@ -216,8 +218,6 @@ class RERScraperService:
     ):
 
         user = rer.get_user()
-        logger.info(f"Fetched user: {user}")
-
         organisation_summaries = rer.get_user_organisations()
         if organisation_reference:
             organisation_summaries = [
@@ -375,7 +375,7 @@ class RERScraperService:
         logger.info(f"Updating RER user: {user}")
         if not self.dry_run:
             user_record = {
-                "id": os.environ.get("SMARTSUITE_RECORD_ID", None),
+                "id": self.ss_login_record_id,
                 **self.smartsuite.map_user(user),
             }
             self.smartsuite.update_user(user_record)
