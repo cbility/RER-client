@@ -26,6 +26,8 @@ uv add git+https://github.com/ORG/RER-client.git
 
 The session-auth Lambda is deployed as a Docker image, so Docker, AWS CLI, and
 SAM CLI must be installed and configured for the `eu-west-2` region.
+The session-auth image installs `session_auth/requirements.txt`, including OpenAI;
+the scraper installs `src/requirements.txt` and does not require OpenAI.
 
 Create a local `.env` file with the deployment values. It must include:
 

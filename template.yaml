@@ -98,7 +98,7 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          RER_SESSION_AUTH_API_URL: "https://jofy3f7p43.execute-api.eu-west-2.amazonaws.com/Prod/"
+          RER_SESSION_AUTH_API_URL: !Sub "https://${RERSessionAuthApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/Prod/"
           RER_SESSION_AUTH_API_KEY_VALUE: !Ref SessionAuthApiKeyValue
           SMARTSUITE_API_URL: "https://app.smartsuite.com/api/v1"
           SMARTSUITE_API_TOKEN: !Ref SmartSuiteApiToken

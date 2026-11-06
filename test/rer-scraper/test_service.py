@@ -47,6 +47,7 @@ def make_service(
         session_auth=StubSessionAuthClient(cookies),  # type: ignore[arg-type]
         retry_invoker=retry_invoker,
         function_name="scraper-function",
+        ss_login_record_id="user-record",
     )
 
 
