@@ -170,8 +170,12 @@ class RERScraperService:
         organisation_reference: str | None = None,
     ) -> tuple[int, ScraperResult | None]:
         run_start = datetime.now(tz=pytz.timezone("Europe/London"))
-        operations = self.smartsuite.get_operations(run_start)
-        logger.debug(f"Retrieved operations: {operations}")
+        if organisation_reference:
+            logger.info("Starting refresh for organisation %s", organisation_reference)
+            operations: list[ScraperOperations] = ["refresh_data"]
+        else:
+            operations = self.smartsuite.get_operations(run_start)
+            logger.debug(f"Retrieved operations: {operations}")
         if len(operations) == 0:
             return 204, None  # successful run but no tasks scheduled
 

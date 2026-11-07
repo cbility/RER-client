@@ -5,6 +5,8 @@ import runpy
 from typing import Any, cast
 from unittest.mock import Mock
 
+import pytest
+
 from rer_client.models import OrganisationSummary, User
 from rer_scraper.service import RERScraperService
 
@@ -73,10 +75,13 @@ def test_local_handler_runs_inline_without_aws(monkeypatch):
 def test_targeted_refresh_retries_with_organisation_reference():
     retry_invoker = Mock()
     service = make_service(None, retry_invoker)
+    smartsuite_mock = cast(Any, service.smartsuite)
+    smartsuite_mock.get_operations.side_effect = AssertionError("Unexpected job query")
 
     status_code, result = service.run(organisation_reference="GEN0191576")
 
     assert (status_code, result) == (202, None)
+    smartsuite_mock.get_operations.assert_not_called()
     retry_invoker.invoke.assert_called_once_with(
         "scraper-function",
         {
@@ -105,18 +110,30 @@ def test_user_update_uses_configured_login_record_id(monkeypatch):
     assert user_record["id"] == "user-record"
 
 
-def test_targeted_refresh_skips_user_update():
+@pytest.mark.parametrize("schedule_retry", [True, False])
+def test_targeted_refresh_forces_refresh_without_job_query(schedule_retry, caplog):
     service = make_service({"session": "cookie"})
+    smartsuite_mock = cast(Any, service.smartsuite)
+    smartsuite_mock.get_operations.side_effect = AssertionError("Unexpected job query")
     service.client_factory = Mock(return_value=Mock())
     service.get_current_data = Mock(return_value=(Mock(), [], [], [], []))
     service.update_rer_user = Mock()
     service.update_rer_organisations = Mock(return_value={})
     service.update_rer_stations = Mock()
 
-    status_code, _ = service.run(organisation_reference="GEN0191576")
+    status_code, _ = service.run(
+        schedule_retry=schedule_retry, organisation_reference="GEN0191576"
+    )
 
     assert status_code == 200
+    smartsuite_mock.get_operations.assert_not_called()
+    service.get_current_data.assert_called_once_with(
+        service.client_factory.return_value, "GEN0191576"
+    )
     service.update_rer_user.assert_not_called()
+    service.update_rer_organisations.assert_called_once_with([], "user-record")
+    service.update_rer_stations.assert_called_once()
+    assert "Starting refresh for organisation GEN0191576" in caplog.text
 
 
 def test_get_current_data_filters_to_requested_organisation():
