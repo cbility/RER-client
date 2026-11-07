@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import runpy
+import sys
 from typing import Any, cast
 from unittest.mock import Mock
 
@@ -48,7 +49,11 @@ def test_handler_forwards_organisation_reference(monkeypatch):
     service.run.assert_called_once_with(organisation_reference="GEN0191576")
 
 
-def test_local_handler_runs_inline_without_aws(monkeypatch):
+@pytest.mark.parametrize(
+    ("cli_args", "expected_dry_run"),
+    [([], True), (["--no-dry-run"], False)],
+)
+def test_local_handler_runs_inline_without_aws(monkeypatch, cli_args, expected_dry_run):
     for name in (
         "RER_SESSION_AUTH_API_URL",
         "RER_SESSION_AUTH_API_KEY_VALUE",
@@ -57,6 +62,7 @@ def test_local_handler_runs_inline_without_aws(monkeypatch):
     ):
         monkeypatch.setenv(name, "test")
     monkeypatch.setattr("dotenv.load_dotenv", Mock())
+    monkeypatch.setattr(sys, "argv", ["handler.py", *cli_args])
     service = Mock()
     service.run.return_value = (200, None)
     service_factory = Mock(return_value=service)
@@ -66,7 +72,7 @@ def test_local_handler_runs_inline_without_aws(monkeypatch):
     assert scraper_handler.__file__
     runpy.run_path(scraper_handler.__file__, run_name="__main__")
 
-    assert service_factory.call_args.kwargs["dry_run"] is True
+    assert service_factory.call_args.kwargs["dry_run"] is expected_dry_run
     service.run.assert_called_once_with(
         schedule_retry=False, organisation_reference=None
     )

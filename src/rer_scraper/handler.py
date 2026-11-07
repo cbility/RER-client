@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from dataclasses import asdict
 import json
 import os
@@ -105,16 +106,27 @@ if __name__ == "__main__":
 
     from dotenv import load_dotenv
 
+    parser = argparse.ArgumentParser(description="Run the RER scraper locally.")
+    parser.add_argument(
+        "--no-dry-run",
+        action="store_false",
+        dest="dry_run",
+        default=True,
+        help="Write scraper updates to SmartSuite (default: dry run).",
+    )
+    args = parser.parse_args()
+
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
     logger.info(
-        "Starting handler locally in dry run mode. Use --no-dry-run to execute smartsuite writes."
+        "Starting handler locally in %s mode.",
+        "dry run" if args.dry_run else "live write",
     )
 
     # Reuse the retry path to run inline without scheduling an AWS invocation.
     event = {"retry_scrape": True}
     context = SimpleNamespace(function_name="local-RERScraperFunction")
-    result = handler(event, context, dry_run=True)
+    result = handler(event, context, dry_run=args.dry_run)
     print(result)
 
 # endregion
