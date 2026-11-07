@@ -1,332 +1,348 @@
 # RER client
 
-Python package for wrapping the Ofgem Renewable Electricity Register (RER) portal. The RER site returns HTML, so this package handles authenticated requests, parses the relevant pages, and returns typed Python objects.
+Python 3.12+ client and AWS Lambda services for the Ofgem Renewable Electricity
+Register (RER). RER serves HTML: this project makes authenticated requests and
+parses responses into typed Python objects.
 
-The repository includes:
-- **RERClient**: Core library for interacting with the RER portal (used by the Scraper Lambda)
-- **Session Auth Lambda**: Manages RER login, MFA, cookie validation, and SmartSuite-backed cookie storage
-- **Scraper Lambda**: Scheduled job that syncs RER data to SmartSuite
+## Architecture
 
-Deployed API usage is documented in [`docs/session-auth-api.md`](docs/session-auth-api.md).
-Scraper usage is documented in [`docs/scraper-api.md`](docs/scraper-api.md).
+| Component | Responsibility |
+| --- | --- |
+| [RERClient](src/rer_client/client.py) and [parsers](src/rer_client/parsing.py) | Request RER pages and parse users, organisations, stations, certificates and output submissions. Response models live in [models.py](src/rer_client/models.py). |
+| [Scraper function](src/rer_scraper/handler.py) | Read pending work from SmartSuite, obtain cookies from the auth API, fetch/parse RER data through `RERClient`, and synchronise records back to SmartSuite. |
+| [Session-auth function](session_auth/rer_session_auth/handler.py) | Validate stored cookies, perform browser login/MFA when necessary, and save refreshed cookies to SmartSuite. |
+
+The [SAM template](template.yaml) deploys **two** API Gateway endpoints:
+
+- **Scraper:** `POST /` — runs pending scraper work.
+- **Session auth:** `GET /` — returns cookies, or starts a background refresh.
+
+Both require their own `x-api-key`. There is no separate client/proxy API in this
+template. HTTP clients call the scraper directly; they do **not** need to obtain
+or forward RER cookies. No scheduled trigger is defined in the template: an
+external caller must invoke the scraper.
 
 ## Installation
 
-```bash
+Run commands from the repository root. Install [uv](https://docs.astral.sh/uv/),
+then install the package and development dependencies:
+
+```powershell
 uv sync
 ```
 
-Install from Git in another repo with:
+To install the library in another project:
 
-```bash
-uv add git+https://github.com/ORG/RER-client.git
+```powershell
+uv add git+https://github.com/cbility/RER-API-wrapper.git
 ```
 
-## Build and Deploy
+### Local configuration
 
-The session-auth Lambda is deployed as a Docker image, so Docker, AWS CLI, and
-SAM CLI must be installed and configured for the `eu-west-2` region.
-The session-auth image installs `session_auth/requirements.txt`, including OpenAI;
-the scraper installs `src/requirements.txt` and does not require OpenAI.
-
-Create a local `.env` file with the deployment values. It must include:
+Keep local values in an ignored `.env` file:
 
 ```dotenv
-RER_EMAIL=...
-RER_PASSWORD=...
 SMARTSUITE_API_TOKEN=...
-MAKE_API_KEY=...
 SMARTSUITE_ACCOUNT_ID=...
+RER_SESSION_AUTH_API_URL=https://YOUR_AUTH_API_ID.execute-api.eu-west-2.amazonaws.com/Prod/
+RER_SESSION_AUTH_API_KEY_VALUE=...
 SMARTSUITE_TABLE_ID=...
 SMARTSUITE_RECORD_ID=...
 SMARTSUITE_COOKIES_FIELD=...
+MAKE_API_KEY=...
 ```
 
-Keep `.env` out of version control. Build the Lambda image without using a stale
-dependency cache, then deploy the infrastructure and synchronize the Lambda
-environment separately:
+- The scraper needs the first four values. It currently uses a login record ID
+  defined in `build_service()` and table/job IDs defined in
+  [smartsuite.py](src/rer_scraper/smartsuite.py); these are not all configurable
+  through environment variables.
+- Auth needs the SmartSuite token, account, table, record and cookie-field values.
+  It reads the RER email/password from fields `sb966ee382` and `sb4e5173b6` on that
+  record, not from `RER_EMAIL`/`RER_PASSWORD` environment variables.
+- `MAKE_API_KEY` is used by the auth MFA email retrieval integration. Optional
+  settings include `SMARTSUITE_REFRESHED_AT_FIELD`, `SMARTSUITE_TIMEOUT_SECONDS`,
+  `PLAYWRIGHT_HEADLESS`, `RER_MFA_MAX_RETRIES`, `RER_MFA_WAIT_SECONDS` and `LOG_LEVEL`.
 
-```bash
-sam build --no-cached
-sam deploy
-./scripts/sync-session-auth-env.sh
+The separate [cookie bootstrap helper](test/bootstrap_rer_cookies.py) uses
+`RER_EMAIL` and `RER_PASSWORD` and saves local cookies to `rer_cookies.json`.
+That file is for development/fixture tools; deployed functions use SmartSuite.
+
+## Calling the scraper over HTTP
+
+### Find the URL and API key
+
+Get `RERScraperApiUrl` from the deployed CloudFormation stack:
+
+```powershell
+aws cloudformation describe-stacks --stack-name rer-client --region eu-west-2 --query "Stacks[0].Outputs[?OutputKey=='RERScraperApiUrl'].OutputValue" --output text --no-cli-pager
 ```
 
-Run `sam deploy` after code or infrastructure changes. Run
-`./scripts/sync-session-auth-env.sh` after every deployment and whenever `.env`
-values change. The sync script updates the Lambda environment through the AWS CLI structured JSON API.
+In API Gateway, obtain the **value** of the `RERScraperApiKey` resource and ensure
+it is associated with the scraper usage plan. Use the scraper key, not the auth
+key. Store the URL and key securely in the calling application's environment,
+for example `RER_SCRAPER_API_URL` and `RER_SCRAPER_API_KEY_VALUE`.
 
-The scraper Lambda requires separate configuration after deployment:
+### Request examples
 
-```bash
-./scripts/sync-scraper-env.sh
+A body is not required. From PowerShell, using `curl.exe`:
+
+```powershell
+curl.exe -i -X POST -H "x-api-key: $env:RER_SCRAPER_API_KEY_VALUE" "$env:RER_SCRAPER_API_URL"
 ```
 
-## Getting started
+To restrict a refresh to one organisation and its stations:
 
-To use the package you need authenticated RER cookies. The helper script at `test/bootstrap_rer_cookies.py` can regenerate local cookies for development.
+```powershell
+curl.exe -i -X POST -H "x-api-key: $env:RER_SCRAPER_API_KEY_VALUE" "${env:RER_SCRAPER_API_URL}?organisation_reference=GEN0191576"
+```
 
+Python client example:
 
-### Use the RERClient
+```python
+import os
+
+import requests
+
+response = requests.post(
+    os.environ["RER_SCRAPER_API_URL"],
+    headers={"x-api-key": os.environ["RER_SCRAPER_API_KEY_VALUE"]},
+    params={"organisation_reference": "GEN0191576"},  # Omit for all organisations.
+    timeout=60,
+)
+response.raise_for_status()
+if response.status_code == 204:
+    print("No pending work")
+elif response.status_code == 202:
+    print("Waiting for session refresh; a background retry was scheduled")
+else:
+    print(response.json())
+```
+
+A targeted request still checks SmartSuite for pending work; it does not force a
+refresh. It skips the shared RER user-record update. The handler reads
+`organisation_reference` from the query string, not a JSON body.
+
+### Responses and execution behaviour
+
+| Status | Meaning |
+| --- | --- |
+| `200` | Pending work completed. The current result envelope is `{"refresh_result": null, "transfer_results": []}`; it is not an export of the fetched RER records. Refresh writes go to SmartSuite. |
+| `202` | Auth cookies are being refreshed. Body: `{"status":"waiting_for_session_refresh"}`. The scraper schedules an asynchronous self-invocation; Lambda may retry that invocation up to twice if the session remains unavailable. |
+| `204` | No pending SmartSuite operations. No response body. |
+
+**HTTP calls perform real SmartSuite writes.** There is no HTTP dry-run parameter.
+`refresh_data` is implemented; a pending `transfer_certificates` operation
+currently raises `NotImplementedError`. Missing/invalid API keys are normally
+rejected by API Gateway with `403`; unhandled Lambda errors can appear as `502`.
+
+The initial scrape is synchronous. The Lambda timeout is 300 seconds, but API
+Gateway's integration timeout can be shorter (the inspected deployment used
+29 seconds). A client timeout or gateway timeout does not necessarily stop the
+Lambda, so check CloudWatch before repeating a request to avoid duplicate work.
+Increasing the client-side timeout alone cannot increase the gateway timeout.
+There is currently no job-status/polling endpoint. CORS is not configured in the
+template; browser clients need additional configuration or a server-side caller.
+
+### Session-auth API
+
+Internal callers use `GET` on the `RERSessionAuthApiUrl` stack output with the
+session-auth API key:
+
+```powershell
+curl.exe -i -H "x-api-key: $env:RER_SESSION_AUTH_API_KEY_VALUE" "$env:RER_SESSION_AUTH_API_URL"
+```
+
+It returns `200` with `{"cookies": {...}}` when cookies are valid, or `202` with a
+message while refreshing them asynchronously. Treat returned cookies as secrets.
+The scraper already performs this step internally.
+
+## Testing and local handler debugging
+
+### Offline tests
+
+The actual handler/local-entry-point tests are in
+[test_targeted_scrape.py](test/rer-scraper/test_targeted_scrape.py). They use mocks
+and cover query forwarding, inline local execution, targeted retry behaviour,
+organisation filtering, and the configured SmartSuite login-record ID.
+[Service tests](test/rer-scraper/test_service.py) cover no-work exits, retry
+scheduling and certificate-transfer preparation.
+
+```powershell
+uv run pytest test\rer-scraper\test_targeted_scrape.py test\rer-scraper\test_service.py -v
+uv run pytest test\session_auth\test_store.py -v
+```
+
+The auth store tests stub HTTP access; they are not end-to-end auth handler tests.
+There are no `test_lambda_handler.py` or `test_scraper_handler.py` files in the
+current tree.
+
+### Run the real scraper handler locally
+
+```powershell
+uv run python -m rer_scraper.handler
+```
+
+The testing section at the end of [handler.py](src/rer_scraper/handler.py):
+
+- Loads `.env` and calls the real `handler()` with a local context.
+- Sets `dry_run=True`, so SmartSuite mappings run but writes are skipped.
+- Uses the existing `retry_scrape` branch with `schedule_retry=False` so execution
+  stays in the local process without invoking AWS Lambda.
+- Still reads **live** SmartSuite operations and calls the deployed auth API and
+  RER. No pending operations means no scrape; pending auth refresh raises
+  `SessionRefreshPending`, so rerun once cookies are ready. Calling the auth API
+  can itself trigger a deployed cookie refresh.
+- Normally prints `None` on successful completion of this retry branch; use logs
+  and breakpoints to inspect the fetched data.
+
+Use the repository's `.venv` interpreter in VS Code and set breakpoints in the
+handler, service, client or parsers. Run/debug the handler file, or configure the
+Python debugger with module `rer_scraper.handler` and the repository root as its
+working directory. Do not use `--no-dry-run` with this module: despite its startup
+log mentioning that flag, the local entry point does not parse command-line
+arguments. To deliberately enable writes, change the testing-section call to
+`dry_run=False` after checking the configured account.
+
+`python -m rer_scraper.handler` can emit a `runpy` warning because
+[rer_scraper/__init__.py](src/rer_scraper/__init__.py) imports the handler before
+Python executes it as `__main__`. This is an import-order issue, not a scrape
+failure; it can occur in a fresh process too. Running the file directly avoids
+that particular module-execution pattern. No warning suppression is required.
+
+### Run the real auth handler locally
+
+Install the local browser once, then run the module with `.env` loaded explicitly:
+
+```powershell
+uv run playwright install chromium
+uv run --env-file .env python -m rer_session_auth.handler
+```
+
+The testing section in [auth handler.py](session_auth/rer_session_auth/handler.py)
+calls `handler({"refresh_cookies": True}, context)` directly: it performs a fresh
+login/MFA flow inline and **writes refreshed cookies to SmartSuite**. It is not a
+dry run, and does not merely validate the existing cookies. It sets visible
+browser mode and `RER_LOCAL_TEST`; the latter selects the code's test recipient
+for failure notifications, not an offline/mock mode. The script does not load
+`.env` itself, hence `uv run --env-file` above. Set breakpoints and run/debug the
+file in VS Code with the same environment to step through the live auth path.
+
+### Cached HTML and live tests
+
+Most tests under [test/rer-python](test/rer-python) use `CachedRERClient` from the
+current [conftest.py](test/rer-python/conftest.py), reading
+`test/rer-html/snapshots/latest/`. They require fixtures on disk, not live cookies
+for every run. In particular, the cached scraper integration test uses the real
+service/mapping code with mocked operation selection and cached RER responses:
+
+```powershell
+uv run pytest test\rer-python -v
+uv run pytest test\rer-python\test_scraper_all_cached.py -v -s
+```
+
+Run the `rer-python` and `rer-scraper` directories separately: both conftest files
+register `--dry-run`/`--no-dry-run`, so collecting both together can produce a
+duplicate-option error. Those pytest flags are distinct from the local handler
+entry point. Do not assume every test is offline or safe to run with real
+credentials: inspect live test files before running them, and do not enable
+`--no-dry-run` unless real writes are intended.
+
+Examples of live coverage:
+
+- [test_live_scraper.py](test/rer-scraper/test_live_scraper.py) calls the deployed
+  auth API and live RER, forces `refresh_data` through mocked operation selection,
+  and uses the dry-run fixture by default.
+- [test_live_smartsuite.py](test/rer-scraper/test_live_smartsuite.py) runs a live
+  operations query only when `RUN_LIVE_SMARTSUITE_TESTS=1` is set.
+- [test_store_live.py](test/session_auth/test_store_live.py) can modify stored
+  cookie fields and trigger auth refreshes; it is not an offline handler test.
+
+To regenerate HTML snapshots, first obtain valid development cookies, then fetch
+and select a snapshot:
+
+```powershell
+uv run python test\bootstrap_rer_cookies.py
+uv run python test\rer-html\fetch_all_snapshots.py
+uv run python test\rer-python\manage_cache.py latest
+uv run python test\rer-python\manage_cache.py status
+```
+
+See [HTML fixture documentation](test/rer-html/README.md). Snapshot generation
+contacts RER and writes local HTML; keep cookies and account data private.
+
+## Build and deploy
+
+Requires Docker running, AWS CLI authentication, and SAM CLI. The default stack
+is `rer-client` in `eu-west-2`, configured in [samconfig.toml](samconfig.toml).
+Use the existing PowerShell deployment script from the repository root:
+
+```powershell
+aws login
+aws configure set region eu-west-2
+. .\.venv\Scripts\Activate.ps1
+. .\.envrc.ps1
+.\scripts\deploy.ps1
+```
+
+[deploy.ps1](scripts/deploy.ps1) requires `SMARTSUITE_API_TOKEN`,
+`RER_SESSION_AUTH_API_KEY_VALUE` and `MAKE_API_KEY` in the process environment.
+It builds the pinned SmartSuite dependency wheel, runs `sam build`, and runs
+`sam deploy` with those parameter values. It does not automatically copy every
+`.env` variable to Lambda.
+
+- Auth is a Playwright container image, installing
+  [session_auth/requirements.txt](session_auth/requirements.txt), including OpenAI.
+- Scraper is a Python 3.12 zip deployment using
+  [src/requirements.txt](src/requirements.txt); OpenAI is not a scraper deployment
+  dependency. The root development environment includes dependencies for both.
+- The template supplies the scraper's auth URL using a CloudFormation reference.
+  Retrieve current URLs from stack outputs instead of hardcoding API IDs.
+- API Gateway generates the API key resources. The scraper's configured outbound
+  auth key (`SessionAuthApiKeyValue`) must match the actual session-auth API key
+  value; that parameter does not set the generated key's value.
+
+Review account/table/record settings in the template before deploying elsewhere.
+The optional [auth](scripts/sync-session-auth-env.sh) and
+[scraper](scripts/sync-scraper-env.sh) environment-sync scripts are Bash tools,
+not part of `deploy.ps1`. They replace the function's environment-variable map;
+review their contents before use so additional settings are not lost. The auth
+sync script still requires `RER_EMAIL` and `RER_PASSWORD`, although the current
+handler reads login credentials from SmartSuite. Manual environment changes may
+also be overwritten by later SAM deployments.
+
+For failures, inspect the deployed function's CloudWatch logs. Both Lambdas have
+300-second timeouts; the scraper can spend several minutes fetching data before
+writing it. A `502` from auth can mean an import/runtime error, not a bad URL.
+
+## Direct Python library use
+
+The library accepts existing cookies and validates them during construction:
 
 ```python
 from rer_client import RERClient
 
-cookies = {"cookie-name": "cookie-value"}
-client = RERClient(auth_cookies=cookies)
-
+client = RERClient(auth_cookies={"cookie-name": "cookie-value"})
 user = client.get_user()
-print(f"Logged in as: {user.full_name}")
-
 organisations = client.get_user_organisations()
-for org in organisations:
-    print(f"  - {org.name} ({org.organisation_id})")
+if organisations:
+    organisation_id = organisations[0].organisation_id
+    details = client.get_organisation_detail(organisation_id)
+    stations = client.get_organisation_stations(organisation_id)
+    certificates = client.get_organisation_certificates(organisation_id)
+    output_data = client.get_organisation_output_data(organisation_id)
 ```
 
-## Testing
+Use attributes on response models, not dictionary subscripting. Additional
+methods include certificate breakdown/history, output-data tasks and station
+declarations; consult
+[client.py](src/rer_client/client.py) for current signatures.
 
-The test suite uses cached HTML responses stored in `test/rer-html/snapshots/latest/`. This allows tests to run offline without depending on the RER portal being available.
+## Limitations and sensitive data
 
-**Run tests:**
-```bash
-uv run pytest test/rer-python/ -v
-```
-
-**Update cache fixtures:**
-```bash
-# Fetch fresh HTML from RER portal (requires valid cookies)
-uv run python test/rer-html/fetch_all_snapshots.py
-
-# Set as latest cache
-uv run python test/rer-python/manage_cache.py latest
-```
-
-**Cache management:**
-```bash
-# Check cache status
-uv run python test/rer-python/manage_cache.py status
-
-# Clean old snapshots (older than 7 days)
-uv run python test/rer-python/manage_cache.py clean --older-than 7d
-```
-
-See `test/rer-html/README.md` for more details on HTML snapshots.
-
-### Lambda Handler Integration Tests
-
-#### client Handler Tests
-
-The `test/rer-python/test_lambda_handler.py` file contains integration tests for the **client Lambda handler** using cached HTML. These tests exercise the full handler workflow without making live requests to the RER portal or writing to SmartSuite.
-
-#### Scraper Handler Tests
-
-The `test/rer-python/test_scraper_handler.py` file contains integration tests for the **Scraper Lambda handler** with mocked SmartSuite operations. These tests verify the scraper workflow with different SmartSuite configurations.
-
-**Run Scraper tests:**
-```bash
-# Run all Scraper handler tests
-uv run pytest test/rer-python/test_scraper_handler.py -v
-
-# Run specific scenario
-uv run pytest test/rer-python/test_scraper_handler.py::TestScraperHandlerRefreshData -v
-```
-
-**What's tested:**
-- Real `handler()` function from `rer_scraper/handler.py`
-- Real `RERScraperService` class
-- Mocked SmartSuite responses (configurable operations)
-- Cached HTML for RER requests
-- Different scenarios:
-  - No operations (returns 204)
-  - `refresh_data` operation (scrapes RER, updates SmartSuite)
-  - Session refresh pending (returns 202, schedules retry)
-  - Retry event execution
-
-**Mocking SmartSuite operations:**
-```python
-# In test fixture
-mock_smartsuite = MockSmartSuiteClient("test", "test")
-mock_smartsuite.set_operations(["refresh_data"])  # or ["transfer_certificates"]
-mock_smartsuite.set_current_organisations([...])  # existing records
-```
-
-#### Scraper Integration Tests with Cached Data
-
-The `test/rer-python/test_scraper_all_cached.py` file contains integration tests that run the **actual Scraper service** against ALL cached HTML data. These tests validate the full scraping and parsing logic with real data volume.
-
-**Run cached data tests:**
-```bash
-# Run all cached data tests with logging
-uv run pytest test/rer-python/test_scraper_all_cached.py -v -s --log-cli-level=INFO
-
-# Run specific test
-uv run pytest test/rer-python/test_scraper_all_cached.py::TestScraperAllCachedData::test_scrape_all_organisations -v -s
-
-# Run individual organisation tests (one per cached org)
-uv run pytest test/rer-python/test_scraper_all_cached.py::TestScraperAllCachedData::test_individual_organisation_scrape -v -s
-```
-
-**Features:**
-- ✅ Real `RERScraperService` class (not mocked)
-- ✅ Real `RERSmartSuiteClient.map_organisation()` method
-- ✅ `CachedRERClient` for all RER API calls (uses cached HTML)
-- ✅ ALL cached organisations from `test/rer-html/snapshots/latest/`
-- ✅ Full logging output showing organisations to create/update
-- ✅ `dry_run` mode enabled by default (no SmartSuite writes)
-
-**SmartSuite Logging:**
-
-The `RERSmartSuiteClient` class includes comprehensive logging for all SmartSuite operations:
-
-- **INFO level**: Shows number of records being updated/created and success confirmation
-- **DEBUG level**: Shows full record data being sent to SmartSuite
-- **ERROR level**: Shows failure details including exception message and failed records
-
-Example output:
-```
-INFO - Updating 20 organisation(s) in SmartSuite...
-DEBUG - Organisations to create: [{'sde6082ea0': 'Org Name', ...}]
-INFO - ✓ Successfully created 20 organisation(s)
-```
-
-On error:
-```
-ERROR - ✗ Failed to create organisations: SmartSuite API error: ...
-ERROR - Failed records: [{'sde6082ea0': 'Org Name', ...}]
-```
-
-**Demo scripts:**
-```bash
-# See SmartSuite logging in action
-uv run python test/rer-python/demo_smartsuite_logging.py
-
-# See error handling logging
-uv run python test/rer-python/demo_smartsuite_errors.py
-```
-
-**Dry Run Mode:**
-
-The tests use `dry_run=True` by default to prevent accidental writes to SmartSuite. When `dry_run=True`:
-- The scraper processes all organisations normally
-- SmartSuite mapping is performed using the **REAL** `RERSmartSuiteClient.map_organisation()` method
-- Logs show all organisations that would be created/updated
-- **No actual writes** are made to SmartSuite (the service skips them)
-
-**Important:** The tests use the **real** `RERSmartSuiteClient` class with NO mocking of the mapping or update methods. Only `get_operations()` is mocked to return test data (prevents querying SmartSuite for test configuration). This means:
-- ✅ Real `map_organisation()` method is tested
-- ✅ Real `update_organisations()` method is called (but skipped when `dry_run=True`)
-- ✅ Real `create_organisations()` method is called (but skipped when `dry_run=True`)
-- ✅ Full code path is tested
-
-To **disable dry run** and test actual SmartSuite integration:
-
-1. **In test code**: Edit `test/rer-python/test_scraper_all_cached.py` and change:
-   ```python
-   service = RERScraperService(
-       smartsuite=real_smartsuite,  # Real SmartSuite client
-       # ... other params ...
-       dry_run=False  # Change from True to False
-   )
-   ```
-
-2. **Provide real credentials**: Set environment variables or update the fixture:
-   ```bash
-   export SMARTSUITE_ACCOUNT_ID="your-account-id"
-   export SMARTSUITE_API_TOKEN="your-api-token"
-   ```
-
-3. **Run the test**:
-   ```bash
-   uv run pytest test/rer-python/test_scraper_all_cached.py -v -s
-   ```
-
-⚠️ **Warning**: Running with `dry_run=False` will make **real changes** to your SmartSuite account!
-
-**Example output with dry_run enabled:**
-```
-INFO - Found 0 orgs to be updated and 20 to be created
-INFO - Organisations to CREATE:
-INFO -   {'sde6082ea0': 'Richard Maxwell Ltd', 's44395f753': 'GEN0215344', 's90b4a920a': 'Generator', 'sf3acd7357': 'Approved'}
-INFO -   {'sde6082ea0': 'AMP Heat Limited', 's44395f753': 'GEN0208381', 's90b4a920a': 'Generator', 'sf3acd7357': 'Approved'}
-...
-INFO - Dry run mode: skipping SmartSuite writes
-```
-
-This shows exactly what would be sent to SmartSuite without making any actual changes.
-
-**Dry run mode:**
-By default, tests run with SmartSuite writes disabled (operations are tracked but not executed). This allows testing the full workflow without modifying production data.
-
-See the individual test files for detailed documentation and examples.
-
-## RERClient Methods
-
-The `RERClient` class provides direct access to RER portal data:
-
-- `get_user()` - User dashboard
-- `get_user_organisations()` - List of organisations
-- `get_organisation(organisation_id)` - Organisation details
-- `get_organisation_stations(organisation_id)` - Stations list
-- `get_organisation_certificates(organisation_id)` - Certificates overview
-- `get_organisation_output_data_tasks(organisation_id)` - Output data tasks
-- `get_station(station_id)` - Station details
-
-## Example: Get Organisation Data
-
-```python
-from rer_client import RERClient
-
-cookies = {"cookie-name": "cookie-value"}
-client = RERClient(auth_cookies=cookies)
-
-org_id = "GEN0215941"
-organisations = client.get_user_organisations()
-stations = client.get_organisation_stations(org_id)
-certificates = client.get_organisation_certificates(org_id)
-```
-
-## Security
-
-- Store credentials securely (use environment variables)
-- Send an `x-api-key` header when calling the session-auth API
-- Don't commit `rer_cookies.json` to version control
-- Cookies grant full account access - treat like passwords
-- Add `rer_cookies.json` to your `.gitignore`
-
-## Session Auth Lambda
-
-- Source lives in `session_auth/`
-- It is deployed as a separate API Gateway endpoint and Lambda function
-- `RERSessionAuthFunction` is packaged as a Lambda container image so Playwright/Chromium is available at runtime
-- It loads cached cookies from a SmartSuite record using `Authorization: Token ...` plus the `ACCOUNT-ID` workspace header
-- Configure `SMARTSUITE_ACCOUNT_ID`, `SMARTSUITE_TABLE_ID`, `SMARTSUITE_RECORD_ID`, and `SMARTSUITE_COOKIES_FIELD` in the auth Lambda environment
-- If cached cookies are invalid, it starts the Playwright + Gmail MFA flow asynchronously and returns `202 Accepted`; the refreshed cookies are saved to SmartSuite for a later request
-- Local SAM build/deploy of the auth Lambda image requires Docker so the image can be built and pushed to ECR
-
-## Session Auth API
-
-Use the separate session-auth API to obtain RER cookies before calling the client API.
-
-1. Get the deployed base URL from the CloudFormation output `RERSessionAuthApiUrl`.
-2. Get the API key value for `RERSessionAuthApiKey` from API Gateway.
-3. Call the session-auth API root. It returns `200` with cached cookies or `202` while refreshing them.
-4. Send returned cookies to the client API.
-
-Notes:
-- A `202` response means refresh is running in the background; retry after a short delay.
-- The client API is separate and requires its own API key.
-
-Example:
-
-```bash
-curl \
-  -H "x-api-key: YOUR_SESSION_AUTH_API_KEY" \
-  "https://YOUR_SESSION_AUTH_API_ID.execute-api.eu-west-2.amazonaws.com/Prod/"
-```
-
-More examples and supported routes are in [`docs/session-auth-api.md`](docs/session-auth-api.md).
-
-## Limitations
-
-- Subject to website changes breaking the client
-- This is an unofficial library with no support from Ofgem
+- This is an unofficial integration, not supported by Ofgem. HTML changes can
+  break parsers and authentication depends on external services.
+- Certificate transfer execution is not implemented in the scraper workflow.
+- Treat API keys, `.env`, RER cookies, SmartSuite records and downloaded HTML as
+  sensitive. `.env` and `rer_cookies.json` are ignored; do not commit them.
+- Debug/error logs can include account or record data. Avoid sharing them without
+  redaction. Do not place API keys in query strings or public browser code.
