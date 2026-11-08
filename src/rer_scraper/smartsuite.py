@@ -62,6 +62,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
     # table ids
     table_id_scraper_job_configuration_table_id = "663d2313b4e7828a33b1ac07"
     table_id_ro_organisations = "665dc5a9eb40433ff6407de9"
+    table_id_scraper_rer_updates = "6720ca1b19875260cd1f76c0"
     table_id_ro_logins = "652b1faba9847148f31cee2b"
     table_id_ro_stations = "652b1faba9847148f31cee2a"
 
@@ -317,6 +318,30 @@ class RERSmartSuiteClient(SmartSuiteClient):
     # endregion mappers
 
     # region changes
+
+    def record_successful_update(
+        self, organisation_ids: list[str], dry_run: bool = False
+    ):
+        logger.info(
+            f"Recording successful update for {len(organisation_ids)} organisation(s)"
+        )
+        if dry_run:
+            logger.info(
+                "Dry run enabled, not recording successful update in SmartSuite."
+            )
+            logger.debug(
+                f"Would have created update record with the following organisation IDs: {organisation_ids}"
+            )
+            return None
+        try:
+            result = self.ss.bulk_add_new_records(
+                table_id=self.table_id_scraper_rer_updates,
+                records=[{"s691a86db0": organisation_ids}],
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to record successful scrape: {e}")
+            raise
 
     def update_user(self, user: dict):
         """Update an existing user record in SmartSuite."""

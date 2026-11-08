@@ -212,6 +212,11 @@ class RERScraperService:
 
             self.update_rer_stations(stations, certificates, output_periods, run_start)
 
+            # add update record to smartsuite
+            self.smartsuite.record_successful_update(
+                list(org_id_map.values()), dry_run=self.dry_run
+            )
+
         if "transfer_certificates" in operations:
             raise NotImplementedError
 
