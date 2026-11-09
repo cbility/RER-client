@@ -193,6 +193,11 @@ class RERScraperService:
         rer = self.client_factory(cookies)
         result = ScraperResult()
         if "refresh_data" in operations:
+            # update run start time to the current time
+            run_start = datetime.now(tz=pytz.timezone("Europe/London"))
+            self.smartsuite.record_run_start(
+                operation="refresh_data", run_start=run_start, dry_run=self.dry_run
+            )
             user, organisations, stations, certificates, output_periods = (
                 self.get_current_data(rer, organisation_reference)
             )

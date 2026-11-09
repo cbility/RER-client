@@ -59,8 +59,14 @@ class RERSmartSuiteClient(SmartSuiteClient):
         "6a7104dc65c1e43caf1f2792",
     )  # smartsuite record ID belonging to the record for the scraper
 
+    job_record_id_map = {
+        "refresh_data": "6a8328cb2f59c6c95139943d",
+        "transfer_certificates": "6a832d732f59c6c951399446",
+    }
+
     # table ids
     table_id_scraper_job_configuration_table_id = "663d2313b4e7828a33b1ac07"
+    table_id_scraper_job_configuration = "663d2313b4e7828a33b1ac07"
     table_id_ro_organisations = "665dc5a9eb40433ff6407de9"
     table_id_scraper_rer_updates = "6720ca1b19875260cd1f76c0"
     table_id_ro_logins = "652b1faba9847148f31cee2b"
@@ -101,7 +107,7 @@ class RERSmartSuiteClient(SmartSuiteClient):
             ),
         )
         operations_records = self.ss.filter_records(
-            table_id="663d2313b4e7828a33b1ac07",  # Scraper job configuration table
+            table_id=self.table_id_scraper_job_configuration_table_id,  # Scraper job configuration table
             fields_to_filter=[scraper_filter, next_run_filter],
         )
 
@@ -109,9 +115,11 @@ class RERSmartSuiteClient(SmartSuiteClient):
 
         for record in operations_records:
             match (record["id"]):
-                case "6a8328cb2f59c6c95139943d":  # data update record id
+                case record_id if record_id == self.job_record_id_map["refresh_data"]:
                     operations.append("refresh_data")
-                case "6a832d732f59c6c951399446":  # certificate transfer record id
+                case record_id if (
+                    record_id == self.job_record_id_map["transfer_certificates"]
+                ):
                     operations.append("transfer_certificates")
 
         return operations
@@ -318,6 +326,34 @@ class RERSmartSuiteClient(SmartSuiteClient):
     # endregion mappers
 
     # region changes
+
+    def record_run_start(
+        self, operation: ScraperOperations, run_start: datetime, dry_run: bool = False
+    ):
+        """Record the start of a run in SmartSuite."""
+        if dry_run:
+            logger.info("Dry run enabled, not recording run start in SmartSuite.")
+            return None
+        logger.info(
+            f"Recording run start for operation '{operation}' at {run_start.isoformat()}"
+        )
+        try:
+            result = self.ss.bulk_update_records(
+                table_id=self.table_id_scraper_job_configuration,
+                records=[
+                    {
+                        "id": self.job_record_id_map["refresh_data"],
+                        "s3d2ee46fa": {
+                            "date": run_start.isoformat(),
+                            "include_time": True,
+                        },
+                    }
+                ],
+            )
+            return result
+        except Exception as e:
+            logger.error(f"Failed to record run start: {e}")
+            raise
 
     def record_successful_update(
         self, organisation_ids: list[str], dry_run: bool = False
