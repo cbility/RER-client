@@ -184,5 +184,31 @@ def test_get_current_data_filters_to_requested_organisation():
     assert stations == []
     assert certificates == [rer.get_organisation_certificates.return_value]
     assert output_periods == [rer.get_organisation_output_data.return_value]
+    rer.get_user_organisations.assert_called_once_with(
+        sort_field="Name", sort_direction="Asc"
+    )
     rer.get_organisation_detail.assert_called_once_with("GEN0191576")
     rer.get_organisation_stations.assert_called_once_with("GEN0191576")
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_missing_target_fails_before_smartsuite_writes(dry_run):
+    service = make_service({"session": "cookie"})
+    service.dry_run = dry_run
+    rer = Mock()
+    rer.get_user_organisations.return_value = []
+    service.client_factory = Mock(return_value=rer)
+    smartsuite_mock = cast(Any, service.smartsuite)
+
+    with pytest.raises(ValueError, match="GEN0192562.*was not found"):
+        service.run(organisation_reference="GEN0192562")
+
+    rer.get_user_organisations.assert_called_once_with(
+        sort_field="Name", sort_direction="Asc"
+    )
+    rer.get_organisation_detail.assert_not_called()
+    smartsuite_mock.update_organisations.assert_not_called()
+    smartsuite_mock.create_organisations.assert_not_called()
+    smartsuite_mock.update_stations.assert_not_called()
+    smartsuite_mock.create_stations.assert_not_called()
+    smartsuite_mock.record_successful_update.assert_not_called()

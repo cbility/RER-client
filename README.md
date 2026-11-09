@@ -110,7 +110,9 @@ else:
 A targeted request forces `refresh_data` for that organisation without querying
 the SmartSuite pending-work table, including on an asynchronous retry. It logs
 the organisation reference at the start and skips the shared RER user-record
-update.
+update. Organisation enumeration explicitly sorts by name across pages to avoid
+RER's unstable default user-status ordering. A missing target raises an error
+instead of recording an empty refresh as successful.
 
 ### Responses and execution behaviour
 

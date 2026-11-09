@@ -227,13 +227,19 @@ class RERScraperService:
     ):
 
         user = rer.get_user()
-        organisation_summaries = rer.get_user_organisations()
+        organisation_summaries = rer.get_user_organisations(
+            sort_field="Name", sort_direction="Asc"
+        )
         if organisation_reference:
             organisation_summaries = [
                 organisation
                 for organisation in organisation_summaries
                 if organisation.organisation_id == organisation_reference
             ]
+            if not organisation_summaries:
+                raise ValueError(
+                    f"Organisation {organisation_reference!r} was not found in the RER organisation list."
+                )
         logger.info(
             f"Fetched {len(organisation_summaries)} organisations for logged in user. Getting extra info for each organisation..."
         )
