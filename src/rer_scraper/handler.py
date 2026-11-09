@@ -114,6 +114,7 @@ if __name__ == "__main__":
         default=True,
         help="Write scraper updates to SmartSuite (default: dry run).",
     )
+    parser.add_argument("--org-ref", help="Force a refresh for this organisation reference.")
     args = parser.parse_args()
 
     load_dotenv()
@@ -124,7 +125,9 @@ if __name__ == "__main__":
     )
 
     # Reuse the retry path to run inline without scheduling an AWS invocation.
-    event = {"retry_scrape": True}
+    event: dict[str, Any] = {"retry_scrape": True}
+    if args.org_ref:
+        event["queryStringParameters"] = {"organisation_reference": args.org_ref}
     context = SimpleNamespace(function_name="local-RERScraperFunction")
     result = handler(event, context, dry_run=args.dry_run)
     print(result)

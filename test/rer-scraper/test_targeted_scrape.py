@@ -50,10 +50,17 @@ def test_handler_forwards_organisation_reference(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("cli_args", "expected_dry_run"),
-    [([], True), (["--no-dry-run"], False)],
+    ("cli_args", "expected_dry_run", "expected_org_ref"),
+    [
+        ([], True, None),
+        (["--no-dry-run"], False, None),
+        (["--org-ref", "GEN0191576"], True, "GEN0191576"),
+        (["--no-dry-run", "--org-ref", "GEN0191576"], False, "GEN0191576"),
+    ],
 )
-def test_local_handler_runs_inline_without_aws(monkeypatch, cli_args, expected_dry_run):
+def test_local_handler_runs_inline_without_aws(
+    monkeypatch, cli_args, expected_dry_run, expected_org_ref
+):
     for name in (
         "RER_SESSION_AUTH_API_URL",
         "RER_SESSION_AUTH_API_KEY_VALUE",
@@ -74,7 +81,7 @@ def test_local_handler_runs_inline_without_aws(monkeypatch, cli_args, expected_d
 
     assert service_factory.call_args.kwargs["dry_run"] is expected_dry_run
     service.run.assert_called_once_with(
-        schedule_retry=False, organisation_reference=None
+        schedule_retry=False, organisation_reference=expected_org_ref
     )
 
 

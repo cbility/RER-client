@@ -167,8 +167,9 @@ The testing section at the end of [handler.py](src/rer_scraper/handler.py):
 - Sets `dry_run=True`, so SmartSuite mappings run but writes are skipped.
 - Uses the existing `retry_scrape` branch with `schedule_retry=False` so execution
   stays in the local process without invoking AWS Lambda.
-- Still reads **live** SmartSuite operations and calls the deployed auth API and
-  RER. No pending operations means no scrape; pending auth refresh raises
+- Calls the deployed auth API and **live** RER. Without `--org-ref`, it reads live
+  SmartSuite operations; no pending operations means no scrape. With `--org-ref`,
+  it forces a targeted refresh without querying pending work. Pending auth refresh raises
   `SessionRefreshPending`, so rerun once cookies are ready. Calling the auth API
   can itself trigger a deployed cookie refresh.
 - Normally prints `None` on successful completion of this retry branch; use logs
@@ -182,6 +183,14 @@ scraped updates to SmartSuite:
 
 ```powershell
 uv run python -m rer_scraper.handler --no-dry-run
+```
+
+Use `--org-ref` to refresh one organisation locally (dry-run by default).
+Combine it with `--no-dry-run` to enable real SmartSuite writes:
+
+```powershell
+uv run python -m rer_scraper.handler --org-ref GEN0191576
+uv run python -m rer_scraper.handler --org-ref GEN0191576 --no-dry-run
 ```
 
 ### Run the real auth handler locally
